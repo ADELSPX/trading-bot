@@ -2,3 +2,6 @@ numpy>=1.24.0
 pandas>=2.0.0
 python-dotenv>=1.0.0
 requests>=2.31.0
+backtesting>=0.3.3
+yfinance>=0.2.0
+scipy>=1.10.0
