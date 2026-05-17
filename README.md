@@ -78,3 +78,15 @@ python -m scripts.live_signals
 - البوت حالياً **Paper Trading** (محاكي)
 - الـ strike المثالي: **أقرب 0.5 Delta ATM** (من الفيديوهات)
 - أفضل وقت للدخول: **8:30–9:30 صباحاً Eastern** (بعد الافتتاح بـ 30 دقيقة)
+
+## 🔗 مصادر خارجية معتمدة (أضيفت 17 مايو 2026)
+
+| الأداة | المصدر | الفائدة |
+|-------|-------|---------|
+| **TradingAgents** 🏆 | [TradeMaster-NTU](https://github.com/TradeMaster-NTU/TradeMaster) | إطار تداول متعدد الوكلاء — UCLA/MIT |
+| **OpenBB** 🏆 | [OpenBB-finance](https://github.com/OpenBB-finance/OpenBBTerminal) | بيانات مالية شاملة + خيارات (Options) |
+| **Vibe-Trading** | [vibe-trading](https://github.com/vibe-trading) | لغة طبيعية → استراتيجية → باكتست |
+| **FinRL** | [AI4Finance](https://github.com/AI4Finance-Foundation/FinRL) | تعلم تعزيزي للتداول (مستقبلاً) |
+| **qlib** | [Microsoft](https://github.com/microsoft/qlib) | منصة كوانت كاملة (مستقبلاً) |
+
+> جميع المصادر من @bitcoin_way — مراجعة وتقييم ✅
