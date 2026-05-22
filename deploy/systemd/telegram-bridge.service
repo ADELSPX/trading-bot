@@ -1,0 +1,14 @@
+[Unit]
+Description=Telegram Webhook Bridge for Trading Signals
+After=network.target
+
+[Service]
+Type=simple
+User=root
+ExecStart=/usr/bin/python3 /root/trading-bot/scripts/telegram_bridge.py
+Restart=on-failure
+RestartSec=5
+WorkingDirectory=/root/trading-bot
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,19 @@
+[Unit]
+Description=n8n - Workflow Automation
+Documentation=https://docs.n8n.io
+After=network.target
+
+[Service]
+Type=simple
+User=root
+ExecStart=/usr/bin/n8n start
+Restart=on-failure
+RestartSec=10
+Environment=N8N_PORT=5678
+Environment=N8N_HOST=localhost
+Environment=N8N_PROTOCOL=http
+Environment=WEBHOOK_URL=http://localhost:5678/
+WorkingDirectory=/root/.n8n
+
+[Install]
+WantedBy=multi-user.target

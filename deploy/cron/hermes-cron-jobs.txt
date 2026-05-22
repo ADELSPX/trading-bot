@@ -1,0 +1,37 @@
+# Hermes Cron Jobs — as of May 22, 2026
+# أعد تشغيلها بعد استعادة النظام
+
+# 1. نشرة أخبار الصباح — كل 9 صباحاً
+hermes cron create \
+  --name "نشرة أخبار الصباح" \
+  --schedule "0 9 * * *" \
+  --skill daily-tech-news \
+  --prompt "Fetch today's tech news from Techmeme via Jina AI: curl -sL --max-time 15 \"https://r.jina.ai/https://techmeme.com\" | head -300. Summarize top 5 stories in Arabic, bullet format. Include source links." \
+  --deliver origin \
+  --toolsets terminal,web
+
+# 2. نسخة احتياطية يومية — كل 3 فجراً
+hermes cron create \
+  --name "نسخه احتياطيه يوميه" \
+  --schedule "0 3 * * *" \
+  --prompt "Run the Hermes daily backup script: bash ~/.hermes/scripts/hermes-backup.sh. This archives memory, skills, and configs." \
+  --deliver origin \
+  --toolsets terminal
+
+# 3. نشرة أخبار المساء — كل 9 مساءً
+hermes cron create \
+  --name "نشرة أخبار المساء" \
+  --schedule "0 21 * * *" \
+  --skill daily-tech-news \
+  --prompt "Fetch today's latest tech news from Techmeme via Jina AI. Summarize top stories in Arabic, bullet format." \
+  --deliver origin \
+  --toolsets terminal,web
+
+# 4. AWS AgentCore + x402 Monitor — كل 3 أيام
+hermes cron create \
+  --name "AWS AgentCore + x402 Monitor" \
+  --schedule "0 9 */3 * *" \
+  --skill fazza-tools \
+  --prompt "تقرير مراقبة اقتصاد الوكلاء — AWS AgentCore Payments + x402 Protocol. ابحث عن آخر التطورات." \
+  --deliver origin \
+  --toolsets terminal,web
