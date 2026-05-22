@@ -175,41 +175,164 @@ class GammaStrategy:
 
     # ── الخطوة 1: تحليل الأبراج ──
 
+    def extract_towers_from_gamma_curve(
+        self,
+        gamma_curve: list[dict],
+        current_price: float,
+    ) -> list[GammaTower]:
+        """
+        🔥 تحويل قوس القاما (منحنى) → خطوط أفقية (أبراج)
+        ═══════════════════════════════════════════════════════
+        المنهجية — أبو فهد القاما:
+
+        المدخلات: بيانات GAMMA Exposure حقيقية من هيئة سوق المال
+        الأمريكية (SEC/CFTC) — تباع لشركات البيانات.
+
+        القاما الخام عبارة عن **منحنى** (قوس) — العلاقة بين السعر
+        وقيمة القاما تشكّل شكل الجرس.
+
+        دوري: أحوّل هذا القوس إلى **خطوط أفقية** (أبراج) عند
+        النقاط الحرجة في المنحنى.
+
+        الآلية:
+        1. نقطة انقلاب القاما (Zero Gamma / Flip Point)
+           ← أقوى برج 🔴 أحمر — هنا الصانع ينقلب من شراء لبيع
+        2. أعلى تركيز قاما (Gamma Wall / Peak)
+           ← ثاني أقوى 🟡 أصفر — سيولة كثيفة للصانع
+        3. ثاني أعلى تركيز
+           ← 🔵 أزرق
+        4. النقاط المتبقية
+           ← ⚪ أبيض (مضاربي لحظي)
+
+        المعطيات:
+        - gamma_curve: [{price, gamma, open_interest}, ...]
+          كل نقطة تمثل (سعر, قيمة القاما)
+        - current_price: السعر الحالي
+        """
+        towers = []
+        if not gamma_curve:
+            return towers
+
+        # ── ترتيب النقاط حسب السعر ──
+        sorted_curve = sorted(gamma_curve, key=lambda p: p.get("price", 0))
+
+        # ── 1. البحث عن نقطة انقلاب القاما (أقوى برج 🔴) ──
+        # نقطة الانقلاب = السعر اللي تتغير عنده إشارة القاما
+        # (من موجب → سالب أو العكس)
+        # هذا هو "Flip Point" — المستوى اللي الصانع ينقلب عنده
+        flip_price = None
+        for i in range(len(sorted_curve) - 1):
+            g1 = sorted_curve[i].get("gamma", 0)
+            g2 = sorted_curve[i + 1].get("gamma", 0)
+            if (g1 > 0 > g2) or (g1 < 0 < g2):
+                # تقاطع الصفر — استخدم المتوسط
+                p1 = sorted_curve[i]["price"]
+                p2 = sorted_curve[i + 1]["price"]
+                flip_price = (p1 + p2) / 2
+                break
+
+        if flip_price:
+            towers.append(GammaTower(
+                price=round(flip_price, 2),
+                strength=TowerStrength.RED,
+                has_bus=True,
+                description="🔴 نقطة انقلاب القاما — الصانع ينقلب"
+            ))
+
+        # ── 2. البحث عن قمم القاما (تركيز عالي للسيولة) ──
+        # قمة القاما = أعلى قيمة مطلقة للقاما
+        # هذه "جدران القاما" (Gamma Walls)
+        peaks = []
+        for i in range(1, len(sorted_curve) - 1):
+            g_prev = abs(sorted_curve[i - 1].get("gamma", 0))
+            g_curr = abs(sorted_curve[i].get("gamma", 0))
+            g_next = abs(sorted_curve[i + 1].get("gamma", 0))
+            if g_curr > g_prev and g_curr > g_next:
+                peaks.append({
+                    "price": sorted_curve[i]["price"],
+                    "gamma_abs": g_curr,
+                    "gamma": sorted_curve[i].get("gamma", 0),
+                    "oi": sorted_curve[i].get("open_interest", 0),
+                })
+
+        # ترتيب القمم تنازلياً (الأقوى أولاً)
+        peaks.sort(key=lambda p: p["gamma_abs"], reverse=True)
+
+        for i, peak in enumerate(peaks[:6]):
+            if i == 0:
+                strength = TowerStrength.YELLOW
+                has_bus = True
+                desc = "🟡 أعلى جدار قاما (Gamma Wall)"
+            elif i == 1:
+                strength = TowerStrength.BLUE
+                has_bus = True
+                desc = "🔵 ثاني أعلى تركيز قاما"
+            else:
+                strength = TowerStrength.WHITE
+                has_bus = False
+                desc = "⚪ نقطة قاما ثانوية"
+
+            # ما نكرر مستوى قريب من الـ flip
+            if flip_price and abs(peak["price"] - flip_price) < 0.1:
+                continue
+
+            towers.append(GammaTower(
+                price=round(peak["price"], 2),
+                strength=strength,
+                has_bus=has_bus,
+                description=desc,
+            ))
+
+        # ── 3. إزالة الأبراج المتقاربة جداً ──
+        towers.sort(key=lambda t: t.price)
+        filtered = []
+        for tower in towers:
+            too_close = any(
+                abs(tower.price - existing.price) < 0.15
+                for existing in filtered
+            )
+            if not too_close:
+                filtered.append(tower)
+
+        return filtered
+
     def detect_towers(
         self,
         price_data: dict,
         volume_profile: Optional[dict] = None,
     ) -> list[GammaTower]:
         """
-        اكتشاف أبراج القاما من بيانات السعر
+        اكتشاف أبراج القاما
 
-        الأبراج = نقاط سيولة عالية (Volume Nodes)
-        الترتيب: أحمر (أقوى) > أصفر > أزرق > أبيض
+        المسار الأساسي: تحويل منحنى القاما إلى خطوط
+        (extract_towers_from_gamma_curve)
 
-        في التطبيق الحقيقي: تحتاج GAMMA indicator مخصص
-        هنا نستخدم Volume Profile + Swing Points كبديل
+        المسار الاحتياطي: Volume Profile + Swing Points
+        (يستخدم فقط في غياب بيانات القاما الحقيقية)
         """
         towers = []
+
+        # ── المسار الأساسي: بيانات القاما الحقيقية ──
+        gamma_curve = price_data.get("gamma_curve", [])
+        if gamma_curve:
+            current_price = price_data.get("close", price_data.get("price", 0))
+            return self.extract_towers_from_gamma_curve(gamma_curve, current_price)
+
+        # ── المسار الاحتياطي: Volume Profile ──
         if not price_data:
             return towers
 
         high = price_data.get("high", 0)
         low = price_data.get("low", 0)
-        close = price_data.get("close", 0)
 
         if high == 0 or low == 0:
             return towers
 
-        price_range = high - low
-
-        # استخراج نقاط التأرجح (swing points)
         swings = price_data.get("swing_points", [])
         volume_nodes = volume_profile.get("nodes", []) if volume_profile else []
 
-        # دمج النقاط مع ترتيب القوة
         all_levels = []
 
-        # عقدة الحجم الأعلى = الأحمر (الأقوى)
         if volume_nodes:
             sorted_nodes = sorted(volume_nodes, key=lambda x: x.get("volume", 0), reverse=True)
             for i, node in enumerate(sorted_nodes[:4]):
@@ -221,11 +344,9 @@ class GammaStrategy:
                 )
                 all_levels.append((node["price"], strength))
 
-        # نقاط التأرجح
         for i, swing in enumerate(swings[:8]):
             all_levels.append((swing, TowerStrength.WHITE if i > 2 else TowerStrength.BLUE))
 
-        # إزالة التكرار وتجميع
         seen = set()
         for price, strength in sorted(all_levels, key=lambda x: x[0]):
             rounded = round(price, 2)
