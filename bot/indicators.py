@@ -80,7 +80,7 @@ class TechnicalIndicators:
             return 0.5
 
         # تقريب الدلتا باستخدام CDF
-        delta = self._norm_cdf(d1)
+        delta = TechnicalIndicators._norm_cdf(d1)
 
         return round(delta, 4)
 

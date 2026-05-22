@@ -1,142 +1,171 @@
 """
-trading-bot core — المحرك الرئيسي
+trading-bot core — المحرك الرئيسي (مُحدّث)
 _______________________________________________
-يدير دورة حياة الصفقة: إشارة → تحليل → تنفيذ → مراقبة → إغلاق
+يدير دورة حياة الصفقة: إشارة → تحليل (9 استراتيجيات) → تنفيذ → مراقبة → إغلاق
 """
 
-from dataclasses import dataclass, field
 from datetime import datetime, time
 from typing import Optional
+
 from .strategy import StrategyEngine
 from .indicators import TechnicalIndicators
+from .greeks import GreeksCalculator
 from .risk import RiskManager
 from .execution import OrderExecutor
-
-
-@dataclass
-class TradeConfig:
-    """إعدادات التداول الأساسية"""
-    symbol: str = "SPX"
-    max_position_size: float = 1000.0  # الحد الأقصى للصفقة بالدولار
-    target_profit_pct: float = 50.0    # الهدف % (نصف قيمة العقد)
-    stop_loss_pct: float = 100.0       # وقف الخسارة % (خسارة كاملة)
-    market_open: time = time(9, 30)    # افتتاح السوق (Eastern)
-    market_close: time = time(16, 0)   # إغلاق السوق
+from .models import TradeConfig
 
 
 class TradingBot:
     """
-    المحرك الرئيسي للبوت
-    - يستقبل الإشارات
-    - يحلل باستخدام الاستراتيجيات
-    - يدير المخاطر
-    - ينفذ الأوامر
+    المحرك الرئيسي للبوت — يدعم الاستراتيجيات المتعددة (9)
     """
 
-    def __init__(self, config: TradeConfig = None):
+    def __init__(self, config: Optional[TradeConfig] = None):
         self.config = config or TradeConfig()
         self.strategy = StrategyEngine()
         self.indicators = TechnicalIndicators()
-        self.risk = RiskManager(self.config)
+        self.greeks = GreeksCalculator()
+        self.risk = RiskManager(self.config, self.config.account_balance)
         self.executor = OrderExecutor()
-        self.active_trades: list = []
+        self.active_trades: list[dict] = []
 
     def is_market_open(self) -> bool:
-        """تحقق من وقت السوق — من الفديو الخامس"""
         now = datetime.now().time()
         return self.config.market_open <= now <= self.config.market_close
 
     def process_signal(self, signal: dict) -> Optional[dict]:
         """
-        معالجة إشارة تداول — pipeline كامل
+        معالجة إشارة تداول — pipeline كامل باستخدام 9 استراتيجيات
         """
-        # 1. تحقق من وقت السوق
         if not self.is_market_open():
             print("⛔ السوق مقفل — تجاهل الإشارة")
             return None
 
-        # 2. تحليل فيبوناتشي
+        price = signal.get("price", 0)
+
+        # 1. فيبوناتشي
         fib_levels = self.indicators.fibonacci_levels(signal.get("price_data", {}))
 
-        # 3. حساب الدلتا (من الفديو الرابع)
-        delta = self.indicators.calculate_delta(
-            underlying_price=signal.get("price"),
-            strike=signal.get("strike"),
-            time_to_expiry=signal.get("days_to_expiry", 1),
-            volatility=signal.get("iv", 20),
-        )
+        # 2. توليد strikes حول السعر
+        strikes = self._generate_strikes(price)
 
-        # 4. تقييم الاستراتيجية
-        analysis = self.strategy.evaluate(
+        # 3. تحليل جميع الاستراتيجيات + اختيار الأفضل
+        best = self.strategy.best_strategy(
             signal=signal,
-            fib_levels=fib_levels,
-            delta=delta,
+            price_data=signal.get("price_data", {}),
+            available_strikes=strikes,
+            days_to_expiry=signal.get("days_to_expiry", 30),
         )
 
-        # 5. إدارة المخاطر
-        risk_check = self.risk.evaluate(analysis, self.active_trades)
-
-        if not risk_check["approved"]:
-            print(f"⛔ رفضت الصفقة: {risk_check['reason']}")
+        if not best.approved:
+            print(f"⛔ رفضت الصفقة: {best.reject_reason}")
             return None
 
-        # 6. تنفيذ الأمر
-        order = self.executor.place_order(
-            symbol=self.config.symbol,
-            strike=analysis["recommended_strike"],
-            option_type=analysis["option_type"],
-            quantity=risk_check["quantity"],
-            order_type="LIMIT" if analysis.get("limit_price") else "MARKET",
-            limit_price=analysis.get("limit_price"),
-        )
+        # 4. إدارة المخاطر
+        risk_check = self.risk.evaluate_strategy(best, self.active_trades)
+
+        if not risk_check.approved:
+            print(f"⛔ خطر: {risk_check.reason}")
+            return None
+
+        # 5. تنفيذ جميع أرجل الاستراتيجية
+        trade_legs = []
+        for leg in best.legs:
+            order = self.executor.place_order(
+                symbol=self.config.symbol,
+                strike=leg.strike,
+                option_type=leg.option_type,
+                quantity=leg.quantity * risk_check.quantity,
+                order_type="MARKET",
+            )
+            trade_legs.append({
+                "strike": leg.strike,
+                "type": leg.option_type,
+                "action": leg.action,
+                "quantity": leg.quantity * risk_check.quantity,
+                "filled_price": order.get("filled_price"),
+            })
+
+        max_loss = (best.max_loss or 0) * risk_check.quantity
+        max_profit = (best.max_profit or 0) * risk_check.quantity
 
         trade = {
             "id": len(self.active_trades) + 1,
             "symbol": self.config.symbol,
-            "strike": analysis["recommended_strike"],
-            "entry_price": order.get("filled_price"),
-            "quantity": risk_check["quantity"],
-            "delta": delta,
-            "target": analysis["target"],
-            "stop": risk_check["stop_loss"],
-            "entered_at": datetime.now(),
+            "strategy": best.name,
+            "legs": trade_legs,
+            "entry_time": datetime.now(),
+            "entry_price": sum(l.get("filled_price", 0) for l in trade_legs),
+            "max_loss": round(max_loss, 2),
+            "max_profit": round(max_profit, 2) if max_profit else None,
+            "break_even": best.break_even,
+            "delta": round(best.total_delta, 4),
+            "gamma": round(best.total_gamma, 6),
+            "theta": round(best.total_theta, 6),
+            "vega": round(best.total_vega, 6),
+            "prob_of_profit": risk_check.prob_of_profit,
             "status": "open",
         }
         self.active_trades.append(trade)
 
-        print(f"✅ صفقة {trade['id']}: {trade['strike']} put × {trade['quantity']}")
+        print(f"✅ صفقة {trade['id']}: {best.name} — {len(trade_legs)} أرجل")
+        print(f"   أقصى ربح: ${trade['max_profit']} | أقصى خسارة: ${trade['max_loss']}")
+        print(f"   احتمالية الربح: {trade['prob_of_profit']*100:.0f}%")
+
         return trade
 
     def monitor_positions(self):
-        """مراقبة الصفقات المفتوحة — P&L لحظة بلحظة"""
+        """مراقبة الصفقات المفتوحة"""
         for trade in self.active_trades:
             if trade["status"] != "open":
                 continue
 
-            current_price = self.executor.get_current_price(
-                trade["symbol"], trade["strike"]
-            )
+            total_pnl = 0
+            for leg in trade["legs"]:
+                current_price = self.executor.get_current_price(
+                    trade["symbol"], leg["strike"]
+                )
+                entry = leg.get("filled_price", 0)
+                pnl = (current_price - entry) * leg["quantity"] * 100
+                if leg["action"] == "sell":
+                    pnl = -pnl
+                total_pnl += pnl
 
-            # معادلة الدلتا: حساب السعر المتوقع
-            price_change = (current_price - trade["entry_price"])
-            expected_move = price_change / trade["delta"]
-
-            ply = (current_price - trade["entry_price"]) * trade["quantity"] * 100
-
-            print(f"📊 صفقة {trade['id']}: P&L = ${ply:.2f}")
-
-            # Check target
-            if ply >= trade["target"]:
-                self.close_trade(trade["id"], "هدف محقق ✅")
-            elif ply <= -abs(trade["stop"]):
+            if trade["max_loss"] and total_pnl <= -trade["max_loss"]:
                 self.close_trade(trade["id"], "وقف خسارة ⛔")
 
+            if trade["max_profit"] and total_pnl >= trade["max_profit"]:
+                self.close_trade(trade["id"], "هدف محقق ✅")
+
     def close_trade(self, trade_id: int, reason: str):
-        """إغلاق صفقة — من الفديو الثالث"""
+        """إغلاق صفقة بالكامل — جميع الأرجل"""
         for trade in self.active_trades:
             if trade["id"] == trade_id and trade["status"] == "open":
-                self.executor.close_position(trade["symbol"], trade["strike"])
+                for leg in trade["legs"]:
+                    self.executor.close_position(trade["symbol"], leg["strike"])
                 trade["status"] = "closed"
                 trade["closed_at"] = datetime.now()
                 trade["close_reason"] = reason
                 print(f"🔒 صفقة {trade_id} أغلقت: {reason}")
+
+    def get_portfolio_summary(self) -> dict:
+        """ملخص المحفظة"""
+        open_trades = [t for t in self.active_trades if t["status"] == "open"]
+        closed_trades = [t for t in self.active_trades if t["status"] == "closed"]
+
+        return {
+            "total_trades": len(self.active_trades),
+            "open_positions": len(open_trades),
+            "closed_positions": len(closed_trades),
+            "strategies_used": list(set(t["strategy"] for t in self.active_trades)),
+            "balance": self.config.account_balance,
+            "max_position_size": self.config.max_position_size,
+        }
+
+    @staticmethod
+    def _generate_strikes(price: float, spread: float = 0.03, count: int = 6) -> list[float]:
+        """توليد strikes حول السعر"""
+        strikes = []
+        for i in range(-count, count + 1):
+            strikes.append(round(price * (1 + i * spread), 0))
+        return sorted(set(s for s in strikes if s > 0))

@@ -1,7 +1,7 @@
 """
 إعدادات التداول
 """
-from bot.core import TradeConfig
+from bot.models import TradeConfig
 
 # إعدادات SPX
 SPX_CONFIG = TradeConfig(
