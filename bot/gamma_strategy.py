@@ -364,6 +364,17 @@ class GammaStrategy:
 
     # ── الخطوة 2: تحليل المناطق ──
 
+    # وزن المناطق حسب الإطار الزمني (منهجية أبو فهد)
+    # الأسبوعية والشهرية = الأهم — تمثل سيولة كبيرة
+    # اليومية = متوسطة
+    # الساعة = تأكيد ثانوي فقط (ما تدخل منها لحالها)
+    ZONE_WEIGHT = {
+        ZoneTimeframe.MONTHLY: 3.0,   # 🟣 الأقوى — سيولة مؤسسية
+        ZoneTimeframe.WEEKLY: 2.0,    # 🟡 سيولة أسبوعية كبيرة
+        ZoneTimeframe.DAILY: 1.5,     # 🔵 متوسطة
+        ZoneTimeframe.HOURLY: 0.5,    # 🟢 ضعيفة — تأكيد فقط
+    }
+
     def detect_zones(
         self,
         price_data: dict,
@@ -379,16 +390,21 @@ class GammaStrategy:
         # مناطق محددة مسبقاً (من التحليل اليدوي)
         predefined = price_data.get("zones", [])
         for z in predefined:
+            z_tf = ZoneTimeframe(z.get("timeframe", timeframe.value))
             zones.append(SupplyDemandZone(
                 top=z.get("top", 0),
                 bottom=z.get("bottom", 0),
                 zone_type=ZoneType(z.get("type", "demand")),
-                timeframe=timeframe,
+                timeframe=z_tf,
                 is_confirmed=z.get("confirmed", False),
                 is_broken=z.get("broken", False),
             ))
 
         return zones
+
+    def _get_zone_bonus(self, zone: SupplyDemandZone) -> float:
+        """وزن المنطقة — الأسبوعية/الشهرية أقوى بكثير من الساعة"""
+        return self.ZONE_WEIGHT.get(zone.timeframe, 1.0)
 
     # ── الخطوة 3: تحليل الشموع ──
 
@@ -463,10 +479,14 @@ class GammaStrategy:
                 reasons.append(f"✅ شمعة خضراء فوق برج {tower_below.strength.value}")
 
         # الشرط 2: ارتداد من منطقة طلب + شمعة خضراء ثانية
+        # المناطق المهمة فقط: يومية، أسبوعية، شهرية (الساعة ما تدخل منها)
         for zone in analysis.zones:
-            if zone.zone_type == ZoneType.DEMAND and not zone.is_broken:
+            if (zone.zone_type == ZoneType.DEMAND
+                and not zone.is_broken
+                and zone.timeframe != ZoneTimeframe.HOURLY):  # ⛔ الساعة = تأكيد فقط
                 if zone.bottom <= price <= zone.top:
-                    reasons.append(f"✅ ارتداد من منطقة طلب {zone.timeframe.value}")
+                    weight = self._get_zone_bonus(zone)
+                    reasons.append(f"✅ ارتداد من منطقة طلب {zone.timeframe.value} (وزن: {weight:.1f})")
 
         # الشرط 3: تجاوز برج بشمعة خضراء كاملة
         if candle_5m.body == CandleBody.BULLISH and candle_5m.is_engulfing:
@@ -519,10 +539,14 @@ class GammaStrategy:
                 reasons.append(f"✅ شمعة حمراء تحت برج {tower_above.strength.value}")
 
         # الشرط 2: ارتداد من منطقة عرض + شمعة حمراء ثانية
+        # المناطق المهمة فقط: يومية، أسبوعية، شهرية (الساعة ما تدخل منها)
         for zone in analysis.zones:
-            if zone.zone_type == ZoneType.SUPPLY and not zone.is_broken:
+            if (zone.zone_type == ZoneType.SUPPLY
+                and not zone.is_broken
+                and zone.timeframe != ZoneTimeframe.HOURLY):  # ⛔ الساعة = تأكيد فقط
                 if zone.bottom <= price <= zone.top:
-                    reasons.append(f"✅ ارتداد من منطقة عرض {zone.timeframe.value}")
+                    weight = self._get_zone_bonus(zone)
+                    reasons.append(f"✅ ارتداد من منطقة عرض {zone.timeframe.value} (وزن: {weight:.1f})")
 
         # الشرط 3: كسر برج بشمعة حمراء كاملة
         if candle_5m.body == CandleBody.BEARISH and candle_5m.is_engulfing:
