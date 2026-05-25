@@ -3,3 +3,6 @@ __pycache__/
 .env
 *.pyc
 reports/*.html
+reports/*.json
+data/current_price.txt
+data/cars.db
