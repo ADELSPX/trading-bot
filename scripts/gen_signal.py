@@ -7,12 +7,15 @@ spy = yf.download('SPY', period='30d', progress=False)
 c = spy['Close'].values.flatten()
 spx = float(c[-1]) * 10
 
+o = spy['Open'].values.flatten()
+h = spy['High'].values.flatten()
+l = spy['Low'].values.flatten()
 candles = []
 for i in range(len(c)):
     candles.append({
-        'open': float(spy['Open'].iloc[i]) * 10,
-        'high': float(spy['High'].iloc[i]) * 10,
-        'low': float(spy['Low'].iloc[i]) * 10,
+        'open': float(o[i]) * 10,
+        'high': float(h[i]) * 10,
+        'low': float(l[i]) * 10,
         'close': float(c[i]) * 10,
         'index': i
     })
