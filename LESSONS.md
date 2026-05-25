@@ -7,6 +7,18 @@
 
 ## ❌ أخطاء فادحة (تجنبها بأي ثمن)
 
+### 0. Gemini Vision model انتهى صلاحيته
+- **التاريخ:** 25 مايو 2026
+- **المشكلة:** قراءة الصور فشلت — Gemini model `gemini-2.0-flash` موقوف للمستخدمين الجدد
+- **السبب:** Google أوقف الموديل القديم
+- **الحل:** تغيير الموديل إلى `gemini-2.5-flash` في config.yaml:
+  ```bash
+  hermes config set auxiliary.vision.model gemini-2.5-flash
+  hermes config set auxiliary.vision.provider gemini
+  hermes config set providers.gemini.model gemini-2.5-flash
+  ```
+- **الدرس:** لا تفرض أن الموديلات شغالة للأبد — اختبر قبل التشخيص، Google توقف الموديلات القديمة
+
 ### 1. Strike خاطئ — ضرب SPY في 10 غلط
 - **التاريخ:** مايو 2026
 - **المشكلة:** توليد Strike = 750 بدل 7495
