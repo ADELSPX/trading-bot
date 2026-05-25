@@ -30,7 +30,7 @@ def send_alert(data: dict) -> bool:
 def get_spx_price() -> float:
     """جلب سعر SPX الحالي"""
     spy = yf.download('SPY', period='1d', progress=False)
-    return float(spy['Close'].iloc[-1]) * 10
+    return float(str(spy['Close'].values[-1]).strip('[]')) * 10
 
 def check_signal():
     """فحص الإشارة النشطة"""
