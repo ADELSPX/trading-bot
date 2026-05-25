@@ -1,8 +1,16 @@
 # 🤖 Trading Bot — بوت تداول ذكي
 
-بوت تداول **9 استراتيجيات أوبشن** مع باك تست وإدارة مخاطر متقدمة، مبني على تحليل 30 فيديو تدريبي.
+بوت تداول **11 استراتيجية أوبشن** مع تحليل العرض والطلب والقاما، باك تست، إشارات فورية، ومراقبة تلقائية.
 
-## 📊 الاستراتيجيات
+## 🚀 آخر تحديث — 25 مايو 2026 (v6.0)
+
+- 🎯 **Signal Builder** — توليد عقد SPXW كامل (Strike صحيح + تاريخ + اتجاه)
+- 📡 **مراقب تلقائي** — يفحص السعر كل 10 دقائق ويرسل تنبيه فوري عند التفعيل
+- 🎯 **هدفين** — هدف أول جزئي + هدف ثاني كامل
+- 📐 **منطقة دخول (Range)** — بدل نقطة وحدة
+- ⚖️ **ترتيب بالقرب** — يختار أقرب منطقة للسعر (70% وزن القرب)
+
+## 📊 الاستراتيجيات (11)
 
 | # | الاستراتيجية | الوصف |
 |---|------------|-------|
@@ -15,27 +23,51 @@
 | 7 | **Straddle** | Put + Call ATM |
 | 8 | **Earnings** | حول إعلانات الأرباح |
 | 9 | **Hedge** 🛡️ | حماية المحفظة |
+| 10 | **أبو فهد قاما (GAMMA)** 🚎 | سكالبنج يومي — أبراج + عرض/طلب + شموع |
+| 11 | **العرض والطلب — أبو ليلى** 📊 | ٨ معايير + فريش/فليب/واو تريد |
 
 ## 🏗️ الهيكل
 
 ```
 trading-bot/
 ├── bot/
-│   ├── core.py           # المحرك الرئيسي
-│   ├── strategy.py       # 9 استراتيجيات أوبشن
-│   ├── greeks.py         # Black-Scholes + جميع اليونانيات
-│   ├── indicators.py     # المؤشرات الفنية (Fibonacci, Delta)
-│   ├── risk.py           # إدارة المخاطر المتقدمة
-│   └── execution.py      # تنفيذ الصفقات
-├── backtest/
-│   ├── engine.py         # باك تست (backtesting.py)
-│   └── __init__.py
-├── config/               # إعدادات التداول
-├── data/                 # بيانات الإشارات
+│   ├── core.py                   # المحرك الرئيسي
+│   ├── strategy.py               # 11 استراتيجيات
+│   ├── supply_demand_strategy.py # استراتيجية العرض والطلب (789 سطر)
+│   ├── gamma_strategy.py         # استراتيجية القاما (750 سطر)
+│   ├── signal_builder.py         # 🆕 مولد الإشارات (SPXW + Strike + هدفين)
+│   ├── greeks.py                 # Black-Scholes + جميع اليونانيات
+│   ├── indicators.py             # المؤشرات الفنية
+│   ├── risk.py                   # إدارة المخاطر
+│   └── execution.py              # تنفيذ الصفقات
 ├── scripts/
-│   ├── backtest.py       # تشغيل باك تست
-│   └── live_signals.py   # إشارات حية
+│   ├── gen_signal.py             # 🆕 توليد إشارة + حفظ
+│   ├── signal_watcher.py         # 🆕 مراقب تلقائي (كل 10 دقائق)
+│   ├── signal_alert.py           # إرسال إشارات للتلغرام
+│   ├── live_signals.py           # إشارات حية
+│   └── backtest.py               # باك تست
+├── data/
+│   └── active_signal.json        # 🆕 الإشارة النشطة للمراقبة
+├── config/                       # إعدادات التداول
 └── requirements.txt
+```
+
+## 🔄 دورة الإشارة
+
+```
+⏰ 4:35 عصراً (أحد-خميس)
+   ↓ تحليل SPY × 10 = SPX
+📡 إشارة تتولد (CALL/PUT + Strike + منطقة + هدفين)
+   ↓
+💾 حفظ في active_signal.json
+   ↓
+⏱️ مراقبة كل 10 دقائق
+   ↓
+📍 السعر دخل المنطقة؟ ← 🚀 تنبيه فوري تلغرام
+   ↓
+🎯 الهدف 1 ← 💸 "تم تحقيق الهدف الأول"
+🎯 الهدف 2 ← 🏆 "تم تحقيق الهدف الثاني"  
+🛑 الوقف ← ⛔ "تم تفعيل الوقف"
 ```
 
 ## 🚀 التشغيل
@@ -43,19 +75,24 @@ trading-bot/
 ```bash
 pip install -r requirements.txt
 
+# توليد إشارة
+python scripts/gen_signal.py
+
+# مراقبة الإشارة
+python scripts/signal_watcher.py
+
 # باك تست MACD على QQQ
-python -m scripts.backtest
+python scripts/backtest.py
 
 # إشارات حية
-python -m scripts.live_signals
+python scripts/live_signals.py
 ```
 
 ## 📡 الأسهم المستهدفة
 
+- **SPX** (S&P 500 — عقود SPXW أسبوعية)
 - QQQ (NASDAQ 100)
-- META
-- TSLA
-- SPY (S&P 500)
+- META, TSLA, SPY
 
 ## 🧮 اليونانيات (Greeks)
 
@@ -65,28 +102,20 @@ python -m scripts.live_signals
 | **Gamma** | تغير الدلتا | إدارة المخاطر |
 | **Theta** | تآكل الوقت | وقت الدخول |
 | **Vega** | حساسية للتقلب | Iron Condor |
-| **Rho** | حساسية للفائدة | طويل الأمد |
 
 ## 🔬 المصادر
 
-- 30 فيديو تدريبي (منصة دراية + دار التداول)
-- [backtesting.py](https://github.com/kernc/backtesting.py) — مكتبة الباك تست
+- 36 فيديو تدريبي (دورة الأسهم الأمريكية + العرض والطلب)
+- وثيقة استراتيجية أبو فهد قاما
+- دورة العرض والطلب مع ابوليلى (6 محاضرات)
+- [backtesting.py](https://github.com/kernc/backtesting.py)
 - Black-Scholes Option Pricing Model
 
 ## 📝 ملاحظات
 
+- ⚠️ SPX = SPY × 10 (البيانات من yfinance عبر SPY)
+- العقد: **SPXW أسبوعي** (ينتهي ثلاثاء/خميس)
 - البوت حالياً **Paper Trading** (محاكي)
-- الـ strike المثالي: **أقرب 0.5 Delta ATM** (من الفيديوهات)
-- أفضل وقت للدخول: **8:30–9:30 صباحاً Eastern** (بعد الافتتاح بـ 30 دقيقة)
+- أفضل وقت للدخول: **4:30 عصراً بتوقيت مكة** (بعد افتتاح أمريكا)
 
-## 🔗 مصادر خارجية معتمدة (أضيفت 17 مايو 2026)
-
-| الأداة | المصدر | الفائدة |
-|-------|-------|---------|
-| **TradingAgents** 🏆 | [TradeMaster-NTU](https://github.com/TradeMaster-NTU/TradeMaster) | إطار تداول متعدد الوكلاء — UCLA/MIT |
-| **OpenBB** 🏆 | [OpenBB-finance](https://github.com/OpenBB-finance/OpenBBTerminal) | بيانات مالية شاملة + خيارات (Options) |
-| **Vibe-Trading** | [vibe-trading](https://github.com/vibe-trading) | لغة طبيعية → استراتيجية → باكتست |
-| **FinRL** | [AI4Finance](https://github.com/AI4Finance-Foundation/FinRL) | تعلم تعزيزي للتداول (مستقبلاً) |
-| **qlib** | [Microsoft](https://github.com/microsoft/qlib) | منصة كوانت كاملة (مستقبلاً) |
-
-> جميع المصادر من @bitcoin_way — مراجعة وتقييم ✅
+> ⚠️ للتحليل فقط — ليست توصية مالية
