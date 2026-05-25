@@ -16,6 +16,10 @@ from .gamma_strategy import (
     Direction, TowerStrength, GammaTower, SupplyDemandZone,
     CandleSignal, ZoneType, ZoneTimeframe, CandleBody,
 )
+from .supply_demand_strategy import (
+    SupplyDemandStrategy, EntrySignal, EntryDecision,
+    ZoneState as SDZoneState, TrendType,
+)
 from .indicators import TechnicalIndicators
 from config.models import TradeConfig
 
@@ -55,6 +59,7 @@ class StrategyEngine:
             symbol=self.config.symbol,
             target_profit_pct=self.config.target_profit_pct,
         )
+        self.supply_demand = SupplyDemandStrategy(symbol=self.config.symbol)
 
     # ═══════════════════════════════════════════════════════
     # الاستراتيجيات الأساسية (1-9)
@@ -196,6 +201,68 @@ class StrategyEngine:
         )
 
     # ═══════════════════════════════════════════════════════
+    # 🆕 الاستراتيجية #11: العرض والطلب — أبو ليلى
+    # ═══════════════════════════════════════════════════════
+
+    def evaluate_supply_demand(
+        self,
+        candles: list[dict],
+        current_price: float,
+        swing_strength: int = 3,
+    ) -> StrategyResult:
+        """
+        تقييم استراتيجية العرض والطلب 📊
+        منهجية أبو ليلى — Abo Mazen Trade
+
+        المدخلات:
+        - candles: شموع [{open, high, low, close}]
+        - current_price: السعر الحالي
+        - swing_strength: قوة كشف التأرجح (افتراضي 3)
+        """
+        signal = self.supply_demand.decide(candles, current_price)
+
+        if signal.decision == EntryDecision.WAIT:
+            return StrategyResult(
+                strategy_name="العرض والطلب 📊",
+                symbol=self.config.symbol,
+                direction="none",
+                strike=0,
+                entry_price=current_price,
+                stop_loss=0,
+                target_price=0,
+                target_pct=0,
+                confidence=0.0,
+                approved=False,
+                reason=signal.reason,
+            )
+
+        direction = "call" if "buy" in signal.decision.value else "put"
+
+        return StrategyResult(
+            strategy_name="العرض والطلب 📊",
+            symbol=self.config.symbol,
+            direction=direction,
+            strike=signal.entry_price,
+            entry_price=signal.entry_price,
+            stop_loss=signal.stop_loss,
+            target_price=signal.take_profit,
+            target_pct=round(
+                abs(signal.take_profit - signal.entry_price)
+                / signal.entry_price * 100, 1
+            ),
+            confidence=signal.confidence,
+            approved=signal.confidence >= 0.5,
+            reason=signal.reason,
+            metadata={
+                "zone_type": signal.zone.zone_type.value,
+                "zone_state": signal.zone.state.value,
+                "score": signal.score,
+                "risk_reward": signal.risk_reward,
+                "w_trade": signal.w_trade is not None,
+            },
+        )
+
+    # ═══════════════════════════════════════════════════════
     # تقييم كل الاستراتيجيات — اختيار الأفضل
     # ═══════════════════════════════════════════════════════
 
@@ -206,6 +273,7 @@ class StrategyEngine:
         delta: float,
         greek_data: Optional[dict] = None,
         gamma_data: Optional[dict] = None,
+        supply_demand_data: Optional[dict] = None,
     ) -> StrategyResult:
         """
         تقييم كل الاستراتيجيات واختيار الأفضل
@@ -232,6 +300,15 @@ class StrategyEngine:
                 volume_profile=gamma_data.get("volume_profile"),
             )
             results.append(gamma_result)
+
+        # 🆕 تقييم العرض والطلب إذا توفرت البيانات
+        if supply_demand_data:
+            sd_result = self.evaluate_supply_demand(
+                candles=supply_demand_data.get("candles", []),
+                current_price=supply_demand_data.get("current_price", price),
+                swing_strength=supply_demand_data.get("swing_strength", 3),
+            )
+            results.append(sd_result)
 
         # إضافة تقييم أساسي
         direction = rec.get("entry", "put")
@@ -301,4 +378,5 @@ class StrategyEngine:
             {"id": 8, "name": "إعلانات الأرباح", "type": "event", "capital": "medium"},
             {"id": 9, "name": "تحوط (Hedging) 🛡️", "type": "hedge", "capital": "high"},
             {"id": 10, "name": "قاما أبو فهد (GAMMA) 🚎", "type": "scalping", "capital": "low", "new": True},
+            {"id": 11, "name": "العرض والطلب — أبو ليلى 📊", "type": "supply_demand", "capital": "low", "new": True},
         ]
