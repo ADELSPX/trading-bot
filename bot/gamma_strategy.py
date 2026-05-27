@@ -770,3 +770,90 @@ class GammaStrategy:
             lines.append("⏳ لا توجد إشارة دخول حالياً")
 
         return "\n".join(lines)
+
+
+# ═══════════════════════════════════════════
+# مكتبة أنماط القاما — Gamma Pattern Library
+# مستخرجة من ٢٢ صورة تحليلية (FAHAD_GAMMA@TradingView)
+# ═══════════════════════════════════════════
+
+GAMMA_PATTERNS = [
+    {"id": 1, "condition": "price_at_red", "signal": "CALL", "desc": "السعر عند البرج الأحمر — ارتداد متوقع"},
+    {"id": 2, "condition": "above_blue_toward_white", "signal": "CALL", "desc": "السعر فوق الأزرق متجه للأبيض"},
+    {"id": 3, "condition": "below_blue", "signal": "PUT", "desc": "السعر تحت البرج الأزرق"},
+    {"id": 4, "condition": "at_flip_zone", "signal": "WAIT", "desc": "السعر عند Flip Zone — انتظار"},
+    {"id": 5, "condition": "bounce_red_break_blue", "signal": "CALL", "desc": "ارتداد من الأحمر + اختراق الأزرق"},
+    {"id": 6, "condition": "below_blue_after_white", "signal": "PUT", "desc": "تحت الأزرق بعد قمة بيضاء"},
+    {"id": 7, "condition": "between_red_blue_bounce", "signal": "CALL", "desc": "بين الأحمر والأزرق مع ارتداد"},
+    {"id": 8, "condition": "double_top_white", "signal": "PUT", "desc": "قمة مزدوجة عند الأبيض"},
+    {"id": 9, "condition": "below_all_towers", "signal": "WAIT", "desc": "السعر تحت كل الأبراج"},
+    {"id": 10, "condition": "above_all_towers", "signal": "CALL", "desc": "السعر فوق كل الأبراج"},
+]
+
+
+def match_gamma_pattern(towers, current_price, recent_candles=None):
+    """
+    مطابقة السعر الحالي مع أنماط القاما المعروفة.
+    تطبق على أي سهم — الأنماط عامة وليست خاصة برمز معين.
+    
+    Args:
+        towers: قائمة أبراج [{'price': float, 'strength': str}, ...]
+        current_price: السعر الحالي
+        recent_candles: آخر شمعتين (اختياري)
+    
+    Returns:
+        dict: {pattern_id, signal, confidence, stop, desc}
+    """
+    if not towers:
+        return {"pattern_id": 0, "signal": "WAIT", "confidence": 0, "desc": "لا توجد أبراج"}
+    
+    red = next((t for t in towers if t.get('strength') == 'red' or t.get('name') == 'red'), None)
+    yellow = next((t for t in towers if t.get('strength') == 'yellow' or t.get('name') == 'yellow'), None)
+    blue = next((t for t in towers if t.get('strength') == 'blue' or t.get('name') == 'blue'), None)
+    white = next((t for t in towers if t.get('strength') == 'white' or t.get('name') == 'white'), None)
+    
+    p = current_price
+    
+    # فوق الكل
+    if white and p > white['price']:
+        return {"pattern_id": 10, "signal": "CALL", "confidence": 0.85, 
+                "stop": white['price'], "desc": "فوق كل الأبراج — كلها دعم"}
+    
+    # تحت الكل — انتظار ارتداد
+    if red and p < red['price']:
+        # تحقق من ارتداد حديث
+        if recent_candles and len(recent_candles) >= 2:
+            last = recent_candles[-1]
+            prev = recent_candles[-2]
+            if last.get('close', 0) > last.get('open', 0) and last.get('low', 0) <= red['price']:
+                return {"pattern_id": 9, "signal": "CALL", "confidence": 0.55,
+                        "stop": red['price'] * 0.98, "desc": "ارتداد من تحت الأحمر = FLIP CALL"}
+        return {"pattern_id": 9, "signal": "WAIT", "confidence": 0.4,
+                "desc": "تحت كل الأبراج — انتظار ارتداد"}
+    
+    # عند الأحمر — ارتداد متوقع
+    if red and abs(p - red['price']) / red['price'] < 0.02:
+        return {"pattern_id": 1, "signal": "CALL", "confidence": 0.7,
+                "stop": red['price'] * 0.98, "desc": "عند البرج الأحمر — دخول CALL"}
+    
+    # عند الأزرق — Flip Zone
+    if blue and abs(p - blue['price']) / blue['price'] < 0.02:
+        return {"pattern_id": 4, "signal": "WAIT", "confidence": 0.4,
+                "desc": "عند Flip Zone — انتظار تحديد الاتجاه"}
+    
+    # بين أزرق وأبيض
+    if blue and white and blue['price'] < p < white['price']:
+        return {"pattern_id": 2, "signal": "CALL", "confidence": 0.65,
+                "stop": blue['price'], "desc": "فوق الأزرق متجه للأبيض — CALL"}
+    
+    # بين أحمر وأزرق
+    if red and blue and red['price'] < p < blue['price']:
+        return {"pattern_id": 7, "signal": "CALL", "confidence": 0.55,
+                "stop": red['price'], "desc": "بين الأحمر والأزرق — CALL مع وقف"}
+    
+    # تحت الأزرق
+    if blue and p < blue['price']:
+        return {"pattern_id": 3, "signal": "PUT", "confidence": 0.65,
+                "stop": blue['price'] * 1.02, "desc": "تحت البرج الأزرق — PUT"}
+    
+    return {"pattern_id": 0, "signal": "WAIT", "confidence": 0, "desc": "نمط غير معروف"}
