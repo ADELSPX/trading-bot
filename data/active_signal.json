@@ -7,11 +7,11 @@
   "target1": 7377.7,
   "target2": 7318.9,
   "direction": "PUT",
-  "contract": "SPXW 260526 P 7420",
-  "strike": 7420,
-  "expiry": "260526",
-  "confidence": 0.25,
-  "reason": "منطقة عرض 🔴 | مستهلكة ⚠️ | Base | تقييم 2/8 | شموع:2",
+  "contract": "SPXW 260528 P 7455",
+  "strike": 7455,
+  "expiry": "260528",
+  "confidence": 0.375,
+  "reason": "منطقة عرض 🔴 | مستهلكة ⚠️ | Base | تقييم 3/8 | شموع:3",
   "stage": "pending",
-  "generated_at": "2026-05-25 23:29"
+  "generated_at": "2026-05-26 13:35"
 }
