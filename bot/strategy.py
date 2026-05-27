@@ -21,6 +21,18 @@ from .supply_demand_strategy import (
     ZoneState as SDZoneState, TrendType,
 )
 from .indicators import TechnicalIndicators
+from .liquidity_pools import (
+    LiquidityDetector, LiquidityPool, FakeoutSignal,
+    TrapType, LiquidityPoolType, detect_fakeout_signal,
+)
+from .chart_patterns import (
+    ChartPatternDetector, PatternSignal, PatternType,
+    PatternCategory,
+)
+from .fib_confluence import (
+    FibConfluence, FibConfluenceReport, FibLevelResult,
+    FibLevel, ConfluenceType, quick_fib_entry,
+)
 from config.models import TradeConfig
 
 
@@ -60,6 +72,9 @@ class StrategyEngine:
             target_profit_pct=self.config.target_profit_pct,
         )
         self.supply_demand = SupplyDemandStrategy(symbol=self.config.symbol)
+        self.liquidity = LiquidityDetector()
+        self.patterns = ChartPatternDetector()
+        self.fib = FibConfluence()
 
     # ═══════════════════════════════════════════════════════
     # الاستراتيجيات الأساسية (1-9)
@@ -263,6 +278,223 @@ class StrategyEngine:
         )
 
     # ═══════════════════════════════════════════════════════
+    # 🆕 الاستراتيجية #12: برك السيولة وصيد الأوامر
+    # ═══════════════════════════════════════════════════════
+
+    def evaluate_liquidity(
+        self,
+        candles: list[dict],
+        current_price: float,
+        supply_demand_zones: Optional[list] = None,
+    ) -> StrategyResult:
+        """
+        تقييم استراتيجية برك السيولة وصيد الأوامر 💧
+        منهجية سامي ضيف الله WH SPX
+
+        يبحث عن أفخاخ الكسر الزائف (Bull/Bear Traps)
+        مع تفضيل الأفخاخ المتوافقة مع مناطق العرض/الطلب
+        """
+        fakeout = detect_fakeout_signal(candles, supply_demand_zones)
+
+        if not fakeout:
+            return StrategyResult(
+                strategy_name="السيولة (Liquidity) 💧",
+                symbol=self.config.symbol,
+                direction="none",
+                strike=0,
+                entry_price=current_price,
+                stop_loss=0,
+                target_price=0,
+                target_pct=0,
+                confidence=0.0,
+                approved=False,
+                reason="لا يوجد فخ كسر زائف نشط",
+            )
+
+        tp_pct = abs(fakeout.target_price - fakeout.entry_price) / fakeout.entry_price * 100
+
+        return StrategyResult(
+            strategy_name="السيولة (Liquidity) 💧",
+            symbol=self.config.symbol,
+            direction=fakeout.direction,
+            strike=fakeout.entry_price,
+            entry_price=fakeout.entry_price,
+            stop_loss=fakeout.stop_loss,
+            target_price=fakeout.target_price,
+            target_pct=round(tp_pct, 1),
+            confidence=fakeout.confidence,
+            approved=fakeout.confidence >= 0.6,
+            reason=fakeout.reason,
+            metadata={
+                "trap_type": fakeout.trap_type.value,
+                "broken_level": fakeout.broken_level,
+                "pool_type": fakeout.pool.pool_type.value if fakeout.pool else None,
+                "pool_strength": fakeout.pool.strength if fakeout.pool else 0,
+            },
+        )
+
+    # ═══════════════════════════════════════════════════════
+    # 🆕 الاستراتيجية #13: أنماط الرسم البياني
+    # ═══════════════════════════════════════════════════════
+
+    def evaluate_patterns(
+        self,
+        candles: list[dict],
+        current_price: float,
+        category: Optional[PatternCategory] = None,
+    ) -> StrategyResult:
+        """
+        تقييم استراتيجية أنماط الرسم البياني 📈
+        منهجية سامي ضيف الله WH SPX
+
+        يكشف: الرأس والكتفين، القمة/القاع المزدوج،
+        الأعلام، الرايات، المثلثات
+        """
+        if category == PatternCategory.REVERSAL:
+            patterns = self.patterns.detect_reversal(candles)
+        elif category == PatternCategory.CONTINUATION:
+            patterns = self.patterns.detect_continuation(candles)
+        else:
+            patterns = self.patterns.detect_all(candles)
+
+        if not patterns:
+            return StrategyResult(
+                strategy_name="الأنماط (Patterns) 📈",
+                symbol=self.config.symbol,
+                direction="none",
+                strike=0,
+                entry_price=current_price,
+                stop_loss=0,
+                target_price=0,
+                target_pct=0,
+                confidence=0.0,
+                approved=False,
+                reason="لا توجد أنماط رسم بياني مكتملة",
+            )
+
+        best = patterns[0]  # الأعلى ثقة
+
+        return StrategyResult(
+            strategy_name="الأنماط (Patterns) 📈",
+            symbol=self.config.symbol,
+            direction=best.direction,
+            strike=best.entry_price,
+            entry_price=best.entry_price,
+            stop_loss=best.stop_loss,
+            target_price=best.target_price,
+            target_pct=round(
+                abs(best.target_price - best.entry_price)
+                / best.entry_price * 100, 1
+            ),
+            confidence=best.confidence,
+            approved=best.confidence >= 0.6,
+            reason=best.description,
+            metadata={
+                "pattern_type": best.pattern_type.value,
+                "category": best.category.value,
+                "neckline": best.neckline,
+                "breakout_price": best.breakout_price,
+            },
+        )
+
+    # ═══════════════════════════════════════════════════════
+    # 🆕 الاستراتيجية #14: توافق فيبوناتشي
+    # ═══════════════════════════════════════════════════════
+
+    def evaluate_fib_confluence(
+        self,
+        candles: list[dict],
+        current_price: float,
+        swing_high: Optional[float] = None,
+        swing_low: Optional[float] = None,
+        supply_zones: Optional[list] = None,
+        demand_zones: Optional[list] = None,
+        moving_averages: Optional[dict] = None,
+        bias: str = "call",
+    ) -> StrategyResult:
+        """
+        تقييم استراتيجية توافق فيبوناتشي 📐
+        منهجية سامي ضيف الله WH SPX
+
+        يحسب مستويات فيبوناتشي ويقيس قوتها من التوافقات
+        مع مناطق العرض/الطلب والمتوسطات والقمم السابقة
+        """
+        # كشف تلقائي للقمة والقاع
+        if swing_high is None or swing_low is None:
+            swing_high, swing_low = self.fib.auto_detect_swing(candles)
+
+        if swing_high <= swing_low:
+            return StrategyResult(
+                strategy_name="فيبوناتشي (Fibonacci) 📐",
+                symbol=self.config.symbol,
+                direction="none",
+                strike=0,
+                entry_price=current_price,
+                stop_loss=0,
+                target_price=0,
+                target_pct=0,
+                confidence=0.0,
+                approved=False,
+                reason="نطاق سعري غير كافٍ لرسم فيبوناتشي",
+            )
+
+        report = self.fib.analyze(
+            candles=candles,
+            swing_high=swing_high,
+            swing_low=swing_low,
+            current_price=current_price,
+            supply_zones=supply_zones,
+            demand_zones=demand_zones,
+            moving_averages=moving_averages,
+        )
+
+        entry_signal = self.fib.find_entry_from_confluence(report, bias=bias)
+
+        if not entry_signal:
+            return StrategyResult(
+                strategy_name="فيبوناتشي (Fibonacci) 📐",
+                symbol=self.config.symbol,
+                direction="none",
+                strike=0,
+                entry_price=current_price,
+                stop_loss=0,
+                target_price=0,
+                target_pct=0,
+                confidence=0.0,
+                approved=False,
+                reason=f"لا توجد مستويات فيبوناتشي قوية كافية (أفضل دعم/مقاومة)",
+            )
+
+        strongest = report.strongest_level
+        golden = report.golden_level
+        confluence_count = sum(len(l.conflations) for l in report.levels)
+
+        return StrategyResult(
+            strategy_name="فيبوناتشي (Fibonacci) 📐",
+            symbol=self.config.symbol,
+            direction=bias,
+            strike=entry_signal["entry"],
+            entry_price=entry_signal["entry"],
+            stop_loss=entry_signal["stop"],
+            target_price=entry_signal["target"],
+            target_pct=round(
+                abs(entry_signal["target"] - entry_signal["entry"])
+                / entry_signal["entry"] * 100, 1
+            ),
+            confidence=entry_signal["confidence"],
+            approved=entry_signal["confidence"] >= 0.5,
+            reason=entry_signal["reason"],
+            metadata={
+                "swing_high": swing_high,
+                "swing_low": swing_low,
+                "confluence_count": confluence_count,
+                "golden_level": golden.price if golden else None,
+                "strongest_level": strongest.price if strongest else None,
+                "strongest_weight": strongest.total_weight if strongest else 0,
+            },
+        )
+
+    # ═══════════════════════════════════════════════════════
     # تقييم كل الاستراتيجيات — اختيار الأفضل
     # ═══════════════════════════════════════════════════════
 
@@ -274,6 +506,9 @@ class StrategyEngine:
         greek_data: Optional[dict] = None,
         gamma_data: Optional[dict] = None,
         supply_demand_data: Optional[dict] = None,
+        liquidity_data: Optional[dict] = None,
+        pattern_data: Optional[dict] = None,
+        fib_confluence_data: Optional[dict] = None,
     ) -> StrategyResult:
         """
         تقييم كل الاستراتيجيات واختيار الأفضل
@@ -309,6 +544,38 @@ class StrategyEngine:
                 swing_strength=supply_demand_data.get("swing_strength", 3),
             )
             results.append(sd_result)
+
+        # 🆕 تقييم برك السيولة إذا توفرت البيانات
+        if liquidity_data:
+            liq_result = self.evaluate_liquidity(
+                candles=liquidity_data.get("candles", []),
+                current_price=liquidity_data.get("current_price", price),
+                supply_demand_zones=liquidity_data.get("zones"),
+            )
+            results.append(liq_result)
+
+        # 🆕 تقييم أنماط الرسم البياني إذا توفرت البيانات
+        if pattern_data:
+            pat_result = self.evaluate_patterns(
+                candles=pattern_data.get("candles", []),
+                current_price=pattern_data.get("current_price", price),
+                category=pattern_data.get("category"),
+            )
+            results.append(pat_result)
+
+        # 🆕 تقييم توافق فيبوناتشي إذا توفرت البيانات
+        if fib_confluence_data:
+            fib_result = self.evaluate_fib_confluence(
+                candles=fib_confluence_data.get("candles", []),
+                current_price=fib_confluence_data.get("current_price", price),
+                swing_high=fib_confluence_data.get("swing_high"),
+                swing_low=fib_confluence_data.get("swing_low"),
+                supply_zones=fib_confluence_data.get("supply_zones"),
+                demand_zones=fib_confluence_data.get("demand_zones"),
+                moving_averages=fib_confluence_data.get("moving_averages"),
+                bias=fib_confluence_data.get("bias", "call"),
+            )
+            results.append(fib_result)
 
         # إضافة تقييم أساسي
         direction = rec.get("entry", "put")
@@ -379,4 +646,7 @@ class StrategyEngine:
             {"id": 9, "name": "تحوط (Hedging) 🛡️", "type": "hedge", "capital": "high"},
             {"id": 10, "name": "قاما أبو فهد (GAMMA) 🚎", "type": "scalping", "capital": "low", "new": True},
             {"id": 11, "name": "العرض والطلب — أبو ليلى 📊", "type": "supply_demand", "capital": "low", "new": True},
+            {"id": 12, "name": "برك السيولة وصيد الأوامر 💧", "type": "liquidity", "capital": "low", "new": True},
+            {"id": 13, "name": "أنماط الرسم البياني 📈", "type": "patterns", "capital": "low", "new": True},
+            {"id": 14, "name": "توافق فيبوناتشي 📐", "type": "fib_confluence", "capital": "low", "new": True},
         ]
