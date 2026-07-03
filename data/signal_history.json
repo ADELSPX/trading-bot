@@ -1,0 +1,47 @@
+[
+  {
+    "symbol": "SPX",
+    "price": 7447.8,
+    "direction": "CALL 🟢",
+    "confidence": 0.55,
+    "reasons": [
+      "ارتداد من 🟡 أصفر",
+      "بين 🟡 أصفر و 🔵 أزرق",
+      "🔴 عرض 0.01%"
+    ],
+    "target1": 7499.9,
+    "target2": 7559.5,
+    "stop": 7388.2,
+    "timestamp": "20:31"
+  },
+  {
+    "symbol": "TSLA",
+    "price": 393.5,
+    "direction": "CALL 🟢",
+    "confidence": 0.55,
+    "reasons": [
+      "ارتداد من 🟡 أصفر",
+      "بين 🟡 أصفر و 🔵 أزرق",
+      "🟢 طلب 1.38%"
+    ],
+    "target1": 396.2,
+    "target2": 399.4,
+    "stop": 390.3,
+    "timestamp": "20:31"
+  },
+  {
+    "symbol": "QQQ",
+    "price": 712.6,
+    "direction": "CALL 🟢",
+    "confidence": 0.55,
+    "reasons": [
+      "ارتداد من 🟡 أصفر",
+      "بين 🟡 أصفر و 🔵 أزرق",
+      "🔴 عرض 0.69%"
+    ],
+    "target1": 717.6,
+    "target2": 723.3,
+    "stop": 706.9,
+    "timestamp": "20:31"
+  }
+]

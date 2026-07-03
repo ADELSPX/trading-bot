@@ -5,7 +5,7 @@ from datetime import datetime
 
 PRICE_FILE = "/root/trading-bot/data/current_price.txt"
 SIGNAL_FILE = "/root/trading-bot/data/active_signal.json"
-PYTHON = "/root/trading-bot/venv/bin/python3"
+PYTHON = "/root/trading-bot/.venv/bin/python"
 
 # كود جلب السعر (نمرره عبر stdin مو -c)
 FETCH_CODE = """import yfinance as yf

@@ -4,12 +4,22 @@ ______________________________________________________________
 يشغل كخدمة systemd على port 7890
 """
 
-import json
+import json, os
 from http.server import HTTPServer, BaseHTTPRequestHandler
 import urllib.request
 import urllib.parse
 
-BOT_TOKEN = "8474030966:AAEhaItTB_Th5DzlWaPMTtnVaU70M2fSq6E"
+# Read token from Hermes .env (live token)
+_env_path = "/root/.hermes/.env"
+BOT_TOKEN = "8474030966:***"
+if os.path.exists(_env_path):
+    with open(_env_path) as f:
+        for line in f:
+            if line.startswith("TELEGRAM_BOT_TOKEN="):
+                t = line.split("=", 1)[1].strip().strip('"').strip("'")
+                if t:
+                    BOT_TOKEN = t
+                    break
 CHAT_ID = "15036469"
 
 
@@ -91,7 +101,7 @@ class SignalHandler(BaseHTTPRequestHandler):
         self.wfile.write(json.dumps({"status": status}).encode())
 
     def log_message(self, format, *args):
-        print(f"[Webhook] {args[0]} {args[1]} {args[2]}")
+        if len(args) >= 3: print(f"[Webhook] {args[0]} {args[1]} {args[2]}")
 
 
 if __name__ == "__main__":

@@ -45,7 +45,16 @@
 
 ---
 
-## ⚠️ أخطاء متوسطة (انتبه منها)
+### 6. Telegram Bridge يرفض صيغة text/HTML
+- **التاريخ:** 29 يونيو 2026
+- **المشكلة:** signal_engine_v2.py أرسل `{'text':..., 'parse_mode':'HTML'}` والبريدج رجع `failed`
+- **السبب:** Telegram bridge ينتظر JSON بصيغة `{'type':'entry','symbol':'SPX','direction':'CALL',...}`
+- **الحل:** أرسل لكل إشارة JSON منفصل فيه type/symbol/direction/entry/target1/target2/stop
+- **الدرس:** أي سكريبت يرسل للـ Bridge (localhost:7890) لازم يستخدم صيغة JSON الصحيحة
+
+---
+
+|## ⚠️ أخطاء متوسطة (انتبه منها)
 
 ### 5. استراتيجية اختيار المنطقة — الأعمق ≠ الأفضل
 - **المشكلة:** `supply_demand_strategy.py` كان يختار أعمق منطقة بدل أقربها للسعر

@@ -1,17 +1,19 @@
 {
   "entry_zone": [
-    7429.1,
-    7443.9
+    7491.7,
+    7506.7
   ],
-  "stop_loss": 7495.3,
-  "target1": 7377.7,
-  "target2": 7318.9,
+  "stop_loss": 7547.4,
+  "target1": 7451.0,
+  "target2": 7402.8,
   "direction": "PUT",
-  "contract": "SPXW 260528 P 7470",
-  "strike": 7470,
-  "expiry": "260528",
-  "confidence": 0.5,
-  "reason": "منطقة عرض 🔴 | مستهلكة ⚠️ | Base | تقييم 4/8 | شموع:3",
-  "stage": "pending",
-  "generated_at": "2026-05-27 13:35"
+  "contract": "SPXW 260702 P 7430",
+  "strike": 7430,
+  "expiry": "260702",
+  "confidence": 0.375,
+  "reason": "\u0645\u0646\u0637\u0642\u0629 \u0639\u0631\u0636 \ud83d\udd34 | \u0645\u0633\u062a\u0647\u0644\u0643\u0629 \u26a0\ufe0f | Base | \u062a\u0642\u064a\u064a\u0645 3/8 | \u0634\u0645\u0648\u0639:3",
+  "stage": "active",
+  "generated_at": "2026-07-01 08:27",
+  "entry_price_actual": 7491.9000244140625,
+  "updated_at": "2026-07-01T15:28:31.230099"
 }
