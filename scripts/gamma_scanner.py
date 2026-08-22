@@ -131,27 +131,30 @@ def decide(candle, centers):
     return "WAIT", strike
 
 
-def scan(symbols=None):
+def scan(symbols=None, quiet=False):
     symbols = symbols or SYMBOLS
     results = []
 
     for sym in symbols:
-        print(f"\n📊 {sym} — فحص...")
+        if not quiet:
+            print(f"\n📊 {sym} — فحص...")
         expiries, strikes = get_option_oi(sym)
         if not strikes:
             results.append({"symbol": sym, "signal": "NO_DATA", "centers": []})
             continue
 
         centers = find_liquidity_centers(strikes)
-        print(f"  انتهاءات: {len(expiries)} | استرايكات: {len(strikes)} | مراكز سيولة: {len(centers)}")
+        if not quiet:
+            print(f"  انتهاءات: {len(expiries)} | استرايكات: {len(strikes)} | مراكز سيولة: {len(centers)}")
 
         # السعر الحالي (من بيانات 5m)
         candle = get_5m_signal(sym, None)
-        if candle:
+        if candle and not quiet:
             print(f"  آخر شمعة: {'🟢' if candle['green'] else '🔴'} {candle['close']} ({candle['time']})")
 
         signal, nearest_strike = decide(candle, centers)
-        print(f"  ⚡ الإشارة: {signal}" + (f" (المركز: {nearest_strike})" if nearest_strike else ""))
+        if not quiet:
+            print(f"  ⚡ الإشارة: {signal}" + (f" (المركز: {nearest_strike})" if nearest_strike else ""))
 
         results.append({
             "symbol": sym,
@@ -167,13 +170,15 @@ def scan(symbols=None):
 
 
 def main():
-    symbols = sys.argv[1:] or None
-    results = scan(symbols)
+    symbols = None
+    quiet = False
+    if len(sys.argv) > 1 and "--cron" in sys.argv:
+        quiet = True
+        symbols = [a for a in sys.argv[1:] if a != "--cron"] or None
+    elif sys.argv[1:]:
+        symbols = sys.argv[1:]
 
-    print("\n" + "=" * 60)
-    print("📋 ملخص الفحص:")
-    for r in results:
-        print(f"  {r['symbol']}: {r['signal']}" + (f" @ {r['price']}" if r.get("price") else ""))
+    results = scan(symbols, quiet=quiet)
 
     # حفظ النتائج
     import os
@@ -181,7 +186,16 @@ def main():
     outfile = OUTPUT + datetime.now().strftime("%Y%m%d_%H%M") + ".json"
     with open(outfile, "w", encoding="utf-8") as f:
         json.dump(results, f, ensure_ascii=False, indent=2, default=str)
-    print(f"💾 حفظ: {outfile}")
+
+    # للكرون: اطبع الإشارات الفعلية فقط (صامت لو كلها WAIT — لا يزعج)
+    signals = [r for r in results if r["signal"] in ("PUT", "CALL")]
+    if not signals:
+        return
+    print("⚡ إشارات القاما اليوم:")
+    for r in signals:
+        price = r.get("price") or "?"
+        center = r.get("nearest_center") or "?"
+        print(f"  {r['symbol']}: {r['signal']} @ {price} (المركز: {center})")
 
 
 if __name__ == "__main__":
