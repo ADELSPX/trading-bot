@@ -1,0 +1,3 @@
+{"signal_ref": "AAPL_2026-08-22", "symbol": "AAPL", "signal": "PUT", "action": "SELL", "qty": 1, "status": "Filled", "fill_price": 309.55, "signal_price": 309.42, "center": 310.0, "executed_at": "2026-08-22T01:19:37.134825"}
+{"signal_ref": "META_2026-08-22", "symbol": "META", "signal": "PUT", "action": "SELL", "qty": 1, "status": "Filled", "fill_price": 552.92, "signal_price": 549.91, "center": 550.0, "executed_at": "2026-08-22T01:19:46.515151"}
+{"signal_ref": "QQQ_2026-08-22", "symbol": "QQQ", "signal": "CALL", "action": "BUY", "qty": 1, "status": "Filled", "fill_price": 714.39, "signal_price": 713.41, "center": 705.0, "executed_at": "2026-08-22T01:19:56.878645"}
