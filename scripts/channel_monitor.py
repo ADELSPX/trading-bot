@@ -16,11 +16,10 @@ OUT_DIR = "/root/trading-bot/knowledge/lessons/channels"
 
 CHANNELS = {
     "mohammad-matr": "@ArabicWallStt0",
-    "control-option": "@control_option_education",
     "sami-mukna": -1001773557219,
-    "fawaz-alrja": "@fawazalrja",
     "gamma-fahad": "@FAHAD_GAMMA1",
 }
+# أوقفت بأمر أبو جهاد (25/8): control-option و fawaz-alrja — صامتة من شهور
 
 def load_state():
     if os.path.exists(STATE_FILE):
