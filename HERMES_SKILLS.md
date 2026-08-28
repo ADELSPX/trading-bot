@@ -18,3 +18,10 @@
 - البوابة: systemd (hermes-gateway.service)
 - المنصة: Telegram
 - النسخ الاحتياطي: كل يوم 3 فجراً
+
+## HUD Analyzer (28 أغسطس 2026)
+- السكربت: `scripts/spx_hud_analyzer.py`
+- الفكرة: مستوحاة من Hermes HUD Mode — تحليل مرئي لأي رمز
+- الاستخدام: `python3 scripts/spx_hud_analyzer.py [SYMBOL] [PERIOD] [OUT]`
+- المخرجات: شارت (دعم/مقاومة + فيبوناتشي + RSI + حجم + متوسطات) + ملخص نصي
+- المصدر: تغريدة iamlukethedev عن Hermes HUD (28/8/2026) — طبقها أبو جهاد على SPX
