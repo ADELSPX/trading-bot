@@ -76,12 +76,9 @@ def analyze():
         for _, r in top3.iterrows():
             print(f"    {r['type']} {fmt(r['strike'])} | OI {int(r['openInterest'])} | IV {float(r['impliedVolatility'])*100:.1f}% | {r['exp']}")
 
-        # قراءة القاما (مبدأ فهد): مركز سيولة = كول/بوت
-        print(f"\n  📊 قراءة القاما (مبدأ فهد):")
-        if top_call['strike'] > top_put['strike']:
-            print(f"    الكول ({fmt(top_call['strike'])}) فوق البوت ({fmt(top_put['strike'])}) = ميل صاعد 🟢")
-        else:
-            print(f"    البوت ({fmt(top_put['strike'])}) فوق الكول ({fmt(top_call['strike'])}) = ميل هابط 🔴")
+        # ملاحظة صادقة: الاتجاه يتطلب تحقق إضافي (مبدأ فهد: شمعة 5د + تكرار إدراج الاسترايك)
+        print(f"\n  📊 ملاحظة (مبدأ فهد):")
+        print(f"    مراكز OI العالية = مناطق سيولة يجذبها الصانع — الاتجاه يحتاج شمعة 5د وتحقق، ما نستعجله.")
     except Exception as e:
         print(f"  خيارات ERR: {str(e)[:100]}")
 

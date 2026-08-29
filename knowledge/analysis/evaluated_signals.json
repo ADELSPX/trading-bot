@@ -1,1 +1,233 @@
-{}
+{
+ "AAPL_2026-08-22T01:15_PUT": {
+  "symbol": "AAPL",
+  "signal": "PUT",
+  "time": "2026-08-22T01:15:29.732946",
+  "entry_price": 309.42,
+  "h24": true,
+  "h48": true,
+  "done": true
+ },
+ "META_2026-08-22T01:15_PUT": {
+  "symbol": "META",
+  "signal": "PUT",
+  "time": "2026-08-22T01:15:29.732946",
+  "entry_price": 549.91,
+  "h24": true,
+  "h48": true,
+  "done": true
+ },
+ "QQQ_2026-08-22T01:15_CALL": {
+  "symbol": "QQQ",
+  "signal": "CALL",
+  "time": "2026-08-22T01:15:29.732946",
+  "entry_price": 713.41,
+  "h24": true,
+  "h48": true,
+  "done": true
+ },
+ "AAPL_2026-08-22T20:55_PUT": {
+  "symbol": "AAPL",
+  "signal": "PUT",
+  "time": "2026-08-22T20:55:38.689063",
+  "entry_price": 309.42,
+  "h24": true,
+  "pct_h48": -0.3,
+  "h48": true,
+  "win": false,
+  "done": true
+ },
+ "META_2026-08-22T20:55_PUT": {
+  "symbol": "META",
+  "signal": "PUT",
+  "time": "2026-08-22T20:55:38.689063",
+  "entry_price": 549.91,
+  "h24": true,
+  "pct_h48": -1.68,
+  "h48": true,
+  "win": false,
+  "done": true
+ },
+ "QQQ_2026-08-22T20:55_CALL": {
+  "symbol": "QQQ",
+  "signal": "CALL",
+  "time": "2026-08-22T20:55:38.689063",
+  "entry_price": 713.41,
+  "h24": true,
+  "pct_h48": -1.01,
+  "h48": true,
+  "win": false,
+  "done": true
+ },
+ "AAPL_2026-08-22T20:56_PUT": {
+  "symbol": "AAPL",
+  "signal": "PUT",
+  "time": "2026-08-22T20:56:10.248198",
+  "entry_price": 309.42,
+  "h24": true,
+  "pct_h48": -0.3,
+  "h48": true,
+  "win": false,
+  "done": true
+ },
+ "META_2026-08-22T20:56_PUT": {
+  "symbol": "META",
+  "signal": "PUT",
+  "time": "2026-08-22T20:56:10.248198",
+  "entry_price": 549.91,
+  "h24": true,
+  "pct_h48": -1.68,
+  "h48": true,
+  "win": false,
+  "done": true
+ },
+ "QQQ_2026-08-22T20:56_CALL": {
+  "symbol": "QQQ",
+  "signal": "CALL",
+  "time": "2026-08-22T20:56:10.248198",
+  "entry_price": 713.41,
+  "h24": true,
+  "pct_h48": -1.01,
+  "h48": true,
+  "win": false,
+  "done": true
+ },
+ "AAPL_2026-08-22T21:30_PUT": {
+  "symbol": "AAPL",
+  "signal": "PUT",
+  "time": "2026-08-22T21:30:23.644750",
+  "entry_price": 309.42,
+  "h24": true,
+  "h48": true,
+  "done": true
+ },
+ "META_2026-08-22T21:30_PUT": {
+  "symbol": "META",
+  "signal": "PUT",
+  "time": "2026-08-22T21:30:23.644750",
+  "entry_price": 549.91,
+  "h24": true,
+  "h48": true,
+  "done": true
+ },
+ "QQQ_2026-08-22T21:30_CALL": {
+  "symbol": "QQQ",
+  "signal": "CALL",
+  "time": "2026-08-22T21:30:23.644750",
+  "entry_price": 713.41,
+  "h24": true,
+  "h48": true,
+  "done": true
+ },
+ "AAPL_2026-08-23T21:30_PUT": {
+  "symbol": "AAPL",
+  "signal": "PUT",
+  "time": "2026-08-23T21:30:40.875645",
+  "entry_price": 309.42,
+  "h24": true,
+  "h48": true,
+  "done": true
+ },
+ "NVDA_2026-08-23T21:30_PUT": {
+  "symbol": "NVDA",
+  "signal": "PUT",
+  "time": "2026-08-23T21:30:40.875645",
+  "entry_price": 214.75,
+  "h24": true,
+  "h48": true,
+  "done": true
+ },
+ "META_2026-08-23T21:30_PUT": {
+  "symbol": "META",
+  "signal": "PUT",
+  "time": "2026-08-23T21:30:40.875645",
+  "entry_price": 549.91,
+  "h24": true,
+  "h48": true,
+  "done": true
+ },
+ "QQQ_2026-08-23T21:30_CALL": {
+  "symbol": "QQQ",
+  "signal": "CALL",
+  "time": "2026-08-23T21:30:40.875645",
+  "entry_price": 713.41,
+  "h24": true,
+  "h48": true,
+  "done": true
+ },
+ "NVDA_2026-08-24T15:58_PUT": {
+  "symbol": "NVDA",
+  "signal": "PUT",
+  "time": "2026-08-24T15:58:47.059584",
+  "entry_price": 210.02,
+  "pct_h24": -1.41,
+  "h24": true,
+  "pct_h48": 0.03,
+  "h48": true,
+  "win": false,
+  "done": true
+ },
+ "TSLA_2026-08-24T15:58_PUT": {
+  "symbol": "TSLA",
+  "signal": "PUT",
+  "time": "2026-08-24T15:58:47.059584",
+  "entry_price": 355.61,
+  "pct_h24": 1.54,
+  "h24": true,
+  "pct_h48": 2.74,
+  "h48": true,
+  "win": true,
+  "done": true
+ },
+ "SPY_2026-08-24T15:58_PUT": {
+  "symbol": "SPY",
+  "signal": "PUT",
+  "time": "2026-08-24T15:58:47.059584",
+  "entry_price": 764.27,
+  "pct_h24": -0.2,
+  "h24": true,
+  "pct_h48": -0.23,
+  "h48": true,
+  "win": false,
+  "done": true
+ },
+ "QQQ_2026-08-24T15:58_PUT": {
+  "symbol": "QQQ",
+  "signal": "PUT",
+  "time": "2026-08-24T15:58:47.059584",
+  "entry_price": 707.6,
+  "pct_h24": -0.43,
+  "h24": true,
+  "pct_h48": -0.52,
+  "h48": true,
+  "win": false,
+  "done": true
+ },
+ "TSLA_2026-08-24T21:30_PUT": {
+  "symbol": "TSLA",
+  "signal": "PUT",
+  "time": "2026-08-24T21:30:58.920603",
+  "entry_price": 348.94,
+  "h24": true,
+  "h48": true,
+  "done": true
+ },
+ "META_2026-08-24T21:30_PUT": {
+  "symbol": "META",
+  "signal": "PUT",
+  "time": "2026-08-24T21:30:58.920603",
+  "entry_price": 559.14,
+  "h24": true,
+  "h48": true,
+  "done": true
+ },
+ "SPY_2026-08-24T21:30_PUT": {
+  "symbol": "SPY",
+  "signal": "PUT",
+  "time": "2026-08-24T21:30:58.920603",
+  "entry_price": 763.48,
+  "h24": true,
+  "h48": true,
+  "done": true
+ }
+}
