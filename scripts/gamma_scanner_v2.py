@@ -40,6 +40,7 @@ DEFAULT_WEIGHTS = {
     "activity": 1.0,
     "distance": 1.0,
     "candle_body": 0.5,
+    "gamma_exposure": 0.8,   # ★ طبقة القاما (GEX) — قامات الإغلاق كخريطة سيولة
 }
 
 
@@ -94,6 +95,64 @@ def get_option_oi(ticker_symbol):
                     st["put_oi"] += oi
         time.sleep(0.25)
     return expiries, list(strikes.items()), strikes
+
+
+def get_gamma_exposure(ticker_symbol):
+    """★ طبقة القاما (GEX): قامات الإغلاق كخريطة سيولة الصانع.
+
+    yfinance لا يرجع 'gamma' مباشرة لـ SPY/السائد، فنقدّر GEX من:
+      net_gex(strike) ≈ (call_oi - put_oi) × underlying_price × factor
+    حيث القيمة الموجبة = ضغط كول (السعر يميل للصعود نحو المركز)،
+    والسالبة = ضغط بوت (يميل للهبوط). القيمة المطلقة الكبيرة = مركز سيولة قوي.
+    (هذا يطابق منطق فهد: نوع السيولة من هيمنة الكول/البوت عند نفس الاسترايك)
+    """
+    ticker = yf.Ticker(ticker_symbol)
+    try:
+        expiries = list(ticker.options[:MAX_EXPIRIES])
+        underlying = float(ticker.history(period="1d").iloc[-1]["Close"])
+    except Exception:
+        return {}
+    gex = {}
+    # نجمع OI الكول والبوت لكل استرايك عبر الانتهاءات
+    call_oi = {}
+    put_oi = {}
+    for exp in expiries:
+        try:
+            chain = ticker.option_chain(exp)
+        except Exception:
+            continue
+        for side, rows in (("call", chain.calls), ("put", chain.puts)):
+            for _, row in rows.iterrows():
+                s = round(float(row.get("strike", 0) or 0), 0)
+                oi = float(row.get("openInterest", 0) or 0)
+                if s <= 0 or oi <= 0:
+                    continue
+                if side == "call":
+                    call_oi[s] = call_oi.get(s, 0.0) + oi
+                else:
+                    put_oi[s] = put_oi.get(s, 0.0) + oi
+        time.sleep(0.2)
+    # GEX تقديري: (كول - بوت) × السعر الأساسي × 100 (لكل عقد)
+    for s in set(call_oi) | set(put_oi):
+        net = (call_oi.get(s, 0.0) - put_oi.get(s, 0.0)) * underlying * 100
+        gex[s] = gex.get(s, 0.0) + net
+    return gex
+
+
+def gamma_exposure_score(strike, gex_map):
+    """درجة القاما للاسترايك: القيمة المطلقة الكبيرة = مركز سيولة قوي.
+    نطبّع على أقصى |GEX| (50% منه = درجة كاملة).
+    """
+    if not gex_map:
+        return 50
+    vals = [abs(v) for v in gex_map.values() if v != 0]
+    if not vals:
+        return 50
+    max_abs = max(vals)
+    if max_abs <= 0:
+        return 50
+    this = abs(gex_map.get(strike, 0.0))
+    return min(100.0, this / (max_abs * 0.5) * 100)
 
 
 def find_centers(strikes_items, min_repeat=MIN_REPEAT):
@@ -181,8 +240,8 @@ def time_filter_us():
     return True, ""
 
 
-def decide_v2(price, candle, centers, weights, avg_oi):
-    """القرار الكامل: اتجاه + score تفصيلي"""
+def decide_v2(price, candle, centers, weights, avg_oi, gex_map=None):
+    """القرار الكامل: اتجاه + score تفصيلي (مع طبقة القاما)"""
     time_ok, time_reason = time_filter_us()
     detail = {
         "time_ok": time_ok, "time_reason": time_reason,
@@ -195,6 +254,18 @@ def decide_v2(price, candle, centers, weights, avg_oi):
     nearest_strike, nd = min(centers, key=lambda x: abs(x[0] - price))
     detail["nearest_center"] = nearest_strike
 
+    comps = {
+        "center_strength": center_strength_score(nd, avg_oi),
+        "activity": activity_score(nd),
+        "distance": distance_score(price, nearest_strike),
+        "candle_body": candle_body_score(candle),
+        "gamma_exposure": gamma_exposure_score(nearest_strike, gex_map or {}),
+    }
+    total_w = sum(weights.get(k, DEFAULT_WEIGHTS[k]) for k in comps)
+    score = int(sum(comps[k] * weights.get(k, DEFAULT_WEIGHTS[k]) for k in comps) / total_w)
+    detail["components"] = {k: round(v, 1) for k, v in comps.items()}
+    detail["score"] = score
+
     above, below = price > nearest_strike, price < nearest_strike
     if candle["green"] and above:
         direction = "CALL"
@@ -203,17 +274,6 @@ def decide_v2(price, candle, centers, weights, avg_oi):
     else:
         detail["reason"] = "direction_unclear"
         return "WAIT", nearest_strike, detail
-
-    comps = {
-        "center_strength": center_strength_score(nd, avg_oi),
-        "activity": activity_score(nd),
-        "distance": distance_score(price, nearest_strike),
-        "candle_body": candle_body_score(candle),
-    }
-    total_w = sum(weights.get(k, DEFAULT_WEIGHTS[k]) for k in comps)
-    score = int(sum(comps[k] * weights.get(k, DEFAULT_WEIGHTS[k]) for k in comps) / total_w)
-    detail["components"] = {k: round(v, 1) for k, v in comps.items()}
-    detail["score"] = score
 
     if not time_ok:
         return "WAIT", nearest_strike, detail
@@ -239,7 +299,9 @@ def scan(symbols=None, quiet=False):
         avg_oi = sum(all_oi) / len(all_oi) if all_oi else 0
         candle = get_5m_candle(sym)
         price = candle["last_price"] if candle else None
-        signal, strike, detail = decide_v2(price, candle, centers, weights, avg_oi)
+        # ★ طبقة القاما (قامات الإغلاق كخريطة سيولة)
+        gex_map = get_gamma_exposure(sym)
+        signal, strike, detail = decide_v2(price, candle, centers, weights, avg_oi, gex_map)
 
         entry = {
             "symbol": sym,
