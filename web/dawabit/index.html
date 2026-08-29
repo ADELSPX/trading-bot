@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>مساعد ضوابط المؤتمرات — جامعة طيبة</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', 'Tahoma', sans-serif;
+            background: linear-gradient(135deg, #0d3b2e 0%, #1a5c47 50%, #0d3b2e 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .container {
+            width: 100%;
+            max-width: 680px;
+            background: rgba(255,255,255,0.97);
+            border-radius: 24px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(135deg, #0d3b2e, #1a5c47);
+            color: #fff;
+            padding: 28px 32px 24px;
+            position: relative;
+        }
+        .header::after {
+            content: '';
+            position: absolute;
+            bottom: 0; left: 0; right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, #c9a227, #f0d77b, #c9a227);
+        }
+        .header h1 {
+            font-size: 22px;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .header .icon { font-size: 28px; }
+        .header p {
+            margin-top: 8px;
+            font-size: 14px;
+            opacity: 0.85;
+        }
+        .chat {
+            padding: 24px 32px;
+            min-height: 320px;
+            max-height: 52vh;
+            overflow-y: auto;
+        }
+        .msg {
+            margin-bottom: 16px;
+            display: flex;
+            flex-direction: column;
+        }
+        .msg.user { align-items: flex-end; }
+        .msg.bot { align-items: flex-start; }
+        .bubble {
+            max-width: 85%;
+            padding: 14px 18px;
+            border-radius: 18px;
+            font-size: 15px;
+            line-height: 1.7;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        .msg.user .bubble {
+            background: #1a5c47;
+            color: #fff;
+            border-bottom-left-radius: 4px;
+        }
+        .msg.bot .bubble {
+            background: #f0f4f2;
+            color: #1a3329;
+            border: 1px solid #dde8e3;
+            border-bottom-right-radius: 4px;
+        }
+        .msg.bot .bubble strong { color: #0d3b2e; }
+        .typing {
+            display: inline-block;
+            padding: 12px 18px;
+            background: #f0f4f2;
+            border-radius: 18px;
+            border-bottom-right-radius: 4px;
+        }
+        .typing span {
+            display: inline-block;
+            width: 8px; height: 8px;
+            margin: 0 2px;
+            background: #1a5c47;
+            border-radius: 50%;
+            animation: blink 1.4s infinite both;
+        }
+        .typing span:nth-child(2) { animation-delay: 0.2s; }
+        .typing span:nth-child(3) { animation-delay: 0.4s; }
+        @keyframes blink { 0%, 80%, 100% { opacity: 0.2; } 40% { opacity: 1; } }
+        .input-area {
+            padding: 20px 32px 28px;
+            border-top: 1px solid #e6eef0;
+            display: flex;
+            gap: 12px;
+            background: #fafcfb;
+        }
+        .input-area input {
+            flex: 1;
+            padding: 14px 18px;
+            border: 2px solid #dde8e3;
+            border-radius: 14px;
+            font-size: 15px;
+            font-family: inherit;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        .input-area input:focus { border-color: #1a5c47; }
+        .input-area button {
+            padding: 0 26px;
+            background: linear-gradient(135deg, #0d3b2e, #1a5c47);
+            color: #fff;
+            border: none;
+            border-radius: 14px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.1s, opacity 0.2s;
+        }
+        .input-area button:active { transform: scale(0.96); }
+        .input-area button:disabled { opacity: 0.5; cursor: not-allowed; }
+        .examples {
+            padding: 0 32px 20px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        .examples button {
+            background: #eef5f2;
+            color: #1a5c47;
+            border: 1px solid #d3e4dd;
+            padding: 8px 14px;
+            border-radius: 20px;
+            font-size: 13px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .examples button:hover { background: #dcebe5; }
+        .footer {
+            text-align: center;
+            font-size: 12px;
+            color: #8aa39a;
+            padding: 12px;
+            background: #fafcfb;
+        }
+        @media (max-width: 600px) {
+            .header h1 { font-size: 18px; }
+            .chat { padding: 18px; }
+            .input-area { padding: 16px; flex-wrap: wrap; }
+            .input-area button { width: 100%; padding: 14px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1><span class="icon">📋</span> مساعد ضوابط المؤتمرات</h1>
+            <p>جامعة طيبة — إدارة المؤتمرات والندوات واستضافة الأستاذ الزائر</p>
+        </div>
+        <div class="chat" id="chat">
+            <div class="msg bot">
+                <div class="bubble">أهلاً بك 👋<br>اسأل عن أي شي في ضوابط المؤتمرات والندوات واستضافة الأستاذ الزائر — أجاوبك فوراً من الوثيقة الرسمية.</div>
+            </div>
+        </div>
+        <div class="examples">
+            <button onclick="ask('كم مدة الحضور القصوى للمؤتمر؟')">مدة الحضور القصوى؟</button>
+            <button onclick="ask('ما مهلة تقديم طلب الحضور؟')">مهلة تقديم الطلب؟</button>
+            <button onclick="ask('وش ضوابط حضور مؤتمر خارج المملكة؟')">حضور خارج المملكة؟</button>
+            <button onclick="ask('وش تصرف الجامعة للعضو المشارك؟')">تصرف الجامعة؟</button>
+        </div>
+        <div class="input-area">
+            <input id="q" type="text" placeholder="اكتب سؤالك هنا..." autocomplete="off" onkeypress="if(event.key==='Enter')send()">
+            <button id="btn" onclick="send()">إرسال</button>
+        </div>
+        <div class="footer">مشغّل بواسطة فزّاع 🤖 — إجابات من الوثيقة الرسمية لجامعة طيبة</div>
+    </div>
+
+    <script>
+        const chat = document.getElementById('chat');
+        const input = document.getElementById('q');
+        const btn = document.getElementById('btn');
+
+        function scroll() { chat.scrollTop = chat.scrollHeight; }
+
+        function addMsg(text, who) {
+            const d = document.createElement('div');
+            d.className = 'msg ' + who;
+            const b = document.createElement('div');
+            b.className = 'bubble';
+            b.innerHTML = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+            d.appendChild(b);
+            chat.appendChild(d);
+            scroll();
+            return d;
+        }
+
+        function ask(q) { input.value = q; send(); }
+
+        async function send() {
+            const q = input.value.trim();
+            if (!q) return;
+            addMsg(q, 'user');
+            input.value = '';
+            btn.disabled = true;
+
+            const t = document.createElement('div');
+            t.className = 'msg bot';
+            t.innerHTML = '<div class="typing"><span></span><span></span><span></span></div>';
+            chat.appendChild(t);
+            scroll();
+
+            try {
+                const r = await fetch('/dawabit/api?q=' + encodeURIComponent(q));
+                const data = await r.json();
+                t.remove();
+                addMsg(data.answer || 'عذراً، ما قدرت أجاوب.', 'bot');
+            } catch (e) {
+                t.remove();
+                addMsg('صار خطأ في الاتصال، جرّب مرة ثانية.', 'bot');
+            }
+            btn.disabled = false;
+            input.focus();
+        }
+        input.focus();
+    </script>
+</body>
+</html>
