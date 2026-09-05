@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 """
-TimesFM Forecast Tool — أداة تنبؤ السلاسل الزمنية
-=================================================
-أداة مستقلة تستخدم نموذج Google TimesFM 2.5 (200M) كطبقة تحليل إضافية
-بجانب إشارات Gamma. ليست توصية بيع/شراء — معلومة تحليلية فقط.
+TimesFM Forecast Tool v3 — أداة تنبؤ السلاسل الزمنية
+=====================================================
+أداة مستقلة تستخدم Google TimesFM 3.0 كطبقة تحليل إضافية بجانب إشارات Gamma.
+ليست توصية بيع/شراء — معلومة تحليلية فقط.
 
 التشغيل (على A6 — البيئة C:\timesfm_env):
-    C:\timesfm_env\Scripts\python.exe timesfm_forecast.py --symbol ^SPX --horizon 10
+    C:\timesfm_env\Scripts\python.exe timesfm_forecast.py --symbol "^SPX" --horizon 10
 
 المخرجات JSON:
-    {symbol, last_price, forecast[], move_pct, bias, generated_at}
+    {symbol, last_price, forecast[], move_pct, bias, data_points, generated_at}
 """
 import warnings
 warnings.filterwarnings('ignore')
@@ -28,38 +28,33 @@ def fetch_closes(symbol: str, years: int = 3) -> np.ndarray:
     return closes
 
 
-def build_model():
-    """تحميل نموذج TimesFM 2.5 200M وتجهيزه."""
-    import timesfm
-    from timesfm.timesfm_2p5.timesfm_2p5_torch import TimesFM_2p5_200M_torch
-
-    model = TimesFM_2p5_200M_torch.from_pretrained(
-        'google/timesfm-2.5-200m-pytorch',
-        torch_compile=False,
+def build_forecaster():
+    """تحميل TimesFM 3.0."""
+    from timesfm3 import TimesFM3Evaluator, ModelConfig
+    config = ModelConfig(
+        checkpoint_path="google/timesfm-3.0-pytorch",
+        per_core_batch_size=1,
+        device="cpu",
     )
-    cfg = timesfm.ForecastConfig(
-        max_context=1024,
-        max_horizon=256,
-        normalize_inputs=True,
-        use_continuous_quantile_head=True,
-        force_flip_invariance=True,
-        infer_is_positive=True,
-        fix_quantile_crossing=True,
-    )
-    model.compile(forecast_config=cfg)
-    return model
+    return TimesFM3Evaluator(config)
 
 
 def forecast(symbol: str, horizon: int = 10) -> dict:
     """تنفيذ التنبؤ الكامل وإرجاع النتيجة."""
     closes = fetch_closes(symbol)
-    model = build_model()
+    forecaster = build_forecaster()
 
-    # النموذج يقبل مصفوفة 1D — نعطيه آخر 700 نقطة (ضمن سياق 1024)
+    # TimesFM 3.0 يقبل سلاسل 1D بأطوال متغيرة — نعطيه آخر 700 نقطة
     series = closes[-700:]
-    point_forecast, _ = model.forecast(horizon=horizon, inputs=[series])
+    outputs = list(forecaster.predict_batch(
+        [series],
+        horizon=horizon,
+        return_quantiles=True,
+        use_symmetric_averaging=False,
+    ))
+    out = outputs[0]
 
-    fc = np.asarray(point_forecast[0]).flatten()
+    fc = np.asarray(out.forecast).flatten()
     last = float(closes[-1])
     move_pct = (float(fc[-1]) - last) / last * 100
 
@@ -70,12 +65,21 @@ def forecast(symbol: str, horizon: int = 10) -> dict:
     else:
         bias = 'NEUTRAL'
 
+    # نطاق الثقة 80% (من الكميّات)
+    conf = None
+    try:
+        q = np.asarray(out.quantiles)  # (horizon, 9)
+        conf = {'low': round(float(q[0, 0]), 2), 'high': round(float(q[0, -1]), 2)}
+    except Exception:
+        pass
+
     return {
         'symbol': symbol,
         'last_price': round(last, 2),
         'forecast': [round(float(x), 2) for x in fc],
         'move_pct': round(move_pct, 2),
         'bias': bias,
+        'conf80': conf,
         'data_points': int(len(closes)),
         'generated_at': str(np.datetime64('now', 's')),
     }
@@ -83,7 +87,7 @@ def forecast(symbol: str, horizon: int = 10) -> dict:
 
 # ---------------------------------------------------------------------------
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='TimesFM Forecast Tool')
+    parser = argparse.ArgumentParser(description='TimesFM Forecast Tool v3')
     parser.add_argument('--symbol', default='^SPX', help='رمز السهم (افتراضي ^SPX)')
     parser.add_argument('--horizon', type=int, default=10, help='أفق التنبؤ بالأيام')
     args = parser.parse_args()
