@@ -1,0 +1,48 @@
+{
+ "capital": 104888.0,
+ "trades": [
+  {
+   "symbol": "QQQ",
+   "side": "CALL",
+   "entry": 712.6,
+   "stop": 706.9,
+   "target1": 717.6,
+   "target2": 723.3,
+   "opened_at": "2026-09-09T19:59:36.747258Z",
+   "status": "open",
+   "qty": 100
+  }
+ ],
+ "closed": [
+  {
+   "symbol": "TSLA",
+   "side": "CALL",
+   "entry": 393.5,
+   "stop": 390.3,
+   "target1": 396.2,
+   "target2": 399.4,
+   "opened_at": "2026-09-09T19:59:36.747255Z",
+   "status": "open",
+   "qty": 100,
+   "exit": 390.3,
+   "closed_at": "2026-09-09T19:59:47.938138Z",
+   "pnl": -321.0,
+   "result": "loss"
+  },
+  {
+   "symbol": "SPX",
+   "side": "CALL",
+   "entry": 7447.8,
+   "stop": 7388.2,
+   "target1": 7499.9,
+   "target2": 7559.5,
+   "opened_at": "2026-09-09T19:59:36.747245Z",
+   "status": "open",
+   "qty": 100,
+   "exit": 7499.9,
+   "closed_at": "2026-09-09T19:59:56.736925Z",
+   "pnl": 5209.0,
+   "result": "win"
+  }
+ ]
+}
