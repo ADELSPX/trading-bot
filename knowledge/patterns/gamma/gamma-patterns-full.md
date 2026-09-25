@@ -610,3 +610,4 @@ NOT the new OpenAI-compatible multimodal format with `image_url`.
 - [gamma-fahad-liquidity-vs-schools-20260925.jpg](references/gamma-fahad-liquidity-vs-schools-20260925.jpg)
 - [gamma-fahad-entry-method-20260925.jpg](references/gamma-fahad-entry-method-20260925.jpg)
 - **ملاحظة المصدر:** [gamma-fahad-20260925-note.md](references/gamma-fahad-20260925-note.md)
+- **سلة الرموز (الشارتات الثابتة — 40 رمزاً):** [fahad-watchlist-20260925.md](references/fahad-watchlist-20260925.md) · النسخة الآلية [watchlist_fahad.json](../watchlist_fahad.json)

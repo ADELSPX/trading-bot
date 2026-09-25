@@ -1,0 +1,30 @@
+{
+  "source": "GAMMA FAHAD (@GAMMA_FAHAD / قناة فهد @FAHAD_GAMMA1)",
+  "purpose": "الشارتات الثابتة بالقناة لتحديد مراكز سيولة الصانع (Maker) — قائمة الرموز المعتمدة",
+  "captured": "2026-09-25",
+  "total": 40,
+  "sectors": {
+    "مؤشرات وصناديق": ["SPX", "SPY", "NDX", "QQQ", "GOLD"],
+    "تخزين بيانات": ["MU", "SNDK", "WDC", "STX"],
+    "سحابة AI": ["CRWV", "NBIS"],
+    "معدات وبصريات": ["LITE", "AMAT", "CIEN", "LRCX"],
+    "خوادم": ["ORCL", "DELL"],
+    "أمن سيبراني": ["CRWD", "PANW"],
+    "طاقة": ["BE"],
+    "بتكوين وكريبتو": ["MSTR", "HOOD"],
+    "سيارات كهربائية": ["TSLA", "CVNA"],
+    "قواعد بيانات": ["MDB", "SNOW", "PLTR"],
+    "برمجيات": ["APP", "ADBE"],
+    "أدوية": ["LLY"],
+    "الفضاء": ["SPCX", "RKLB"],
+    "أشباه الموصلات": ["NVDA", "TSM", "MRVL", "INTC", "AMD", "ARM"],
+    "تقنية واتصالات": ["AAPL", "META"]
+  },
+  "yahoo_map": {
+    "SPX": "^SPX",
+    "NDX": "^NDX",
+    "GOLD": "GC=F",
+    "_note": "SPX/NDX على ياهو لازم بادئة ^؛ GOLD ياهو يرجّعه Barrick Gold (GOLD) — المقصود عند فهد غالباً الذهب الفعلي = GC=F (تأكيد مطلوب)"
+  },
+  "verified": "2026-09-25 — الـ38 سهماً كلها تُرجع أسعاراً صحيحة عبر yfinance (بما فيها SPCX). SPX/NDX مؤشرات (تحتاج ^)."
+}
