@@ -13,8 +13,15 @@
 - الأوزان في weights.json يتحدثها signal_feedback.py من نتائج evaluator
 
 الاستخدام:
-  python3 gamma_scanner_v2.py            # تفصيلي
-  python3 gamma_scanner_v2.py --cron     # صامت — يطبع الإشارات الناجحة فقط
+  python3 gamma_scanner_v2.py                      # قائمة فهد كاملة (40 رمزاً)
+  python3 gamma_scanner_v2.py --cron               # صامت — الإشارات فقط (stdout)
+  python3 gamma_scanner_v2.py --list               # طباعة الرموز المختارة والخروج
+  python3 gamma_scanner_v2.py --symbols AAPL,NVDA  # تجاوز صريح
+  python3 gamma_scanner_v2.py --sectors "أشباه الموصلات,الفضاء"
+  python3 gamma_scanner_v2.py --limit 10 --offset 0
+  python3 gamma_scanner_v2.py --expiries 3
+  python3 gamma_scanner_v2.py AAPL NVDA            # مسار قديم = --symbols
+ملاحظة: كل رسائل التقدّم تُطبع على stderr كي يبقى مخرج --cron نظيفاً.
 """
 import json
 import os
@@ -24,8 +31,12 @@ from datetime import datetime
 
 import yfinance as yf
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from watchlist import load_fahad, symbols_by_sector, to_yahoo, LEGACY_SYMBOLS
+
 # ============ الإعدادات ============
-SYMBOLS = ["AAPL", "NVDA", "TSLA", "META", "SPY", "QQQ"]
+# القائمة الرسمية تُقرأ من knowledge/watchlist_fahad.json عبر select_symbols()
+SYMBOLS = LEGACY_SYMBOLS  # احتياطي آمن عند فشل قراءة ملف المراقبة
 MAX_EXPIRIES = 6
 MIN_REPEAT = 3
 OI_TOP_N = 8
@@ -283,24 +294,25 @@ def decide_v2(price, candle, centers, weights, avg_oi, gex_map=None):
     return "WAIT", nearest_strike, detail
 
 
-def scan(symbols=None, quiet=False):
+def scan(symbols=None, quiet=False, yahoo_map=None):
     symbols = symbols or SYMBOLS
     weights = load_weights()
     results = []
     for sym in symbols:
+        yahoo_sym = to_yahoo(sym, yahoo_map)
         if not quiet:
-            print(f"\n📊 {sym}...")
-        expiries, strikes_items, strikes_map = get_option_oi(sym)
+            print(f"\n📊 {sym}...", file=sys.stderr)
+        expiries, strikes_items, strikes_map = get_option_oi(yahoo_sym)
         if not strikes_map:
             results.append({"symbol": sym, "signal": "NO_DATA"})
             continue
         centers = find_centers(strikes_items)
         all_oi = [d["total_oi"] for _, d in centers] or [0]
         avg_oi = sum(all_oi) / len(all_oi) if all_oi else 0
-        candle = get_5m_candle(sym)
+        candle = get_5m_candle(yahoo_sym)
         price = candle["last_price"] if candle else None
         # ★ طبقة القاما (قامات الإغلاق كخريطة سيولة)
-        gex_map = get_gamma_exposure(sym)
+        gex_map = get_gamma_exposure(yahoo_sym)
         signal, strike, detail = decide_v2(price, candle, centers, weights, avg_oi, gex_map)
 
         entry = {
@@ -316,7 +328,7 @@ def scan(symbols=None, quiet=False):
         results.append(entry)
         if not quiet:
             print(f"  ⚡ {signal}" + (f" | مركز: {strike} | score: {detail.get('score')} "
-                  f"{detail['components']}" if strike else ""))
+                  f"{detail['components']}" if strike else ""), file=sys.stderr)
         # الإشارات المرفوضة تنسجل — المخ يتعلم منها لاحقاً
         if signal == "WAIT" and detail.get("score") is not None and detail["components"]:
             log_rejected({"symbol": sym, "price": price, "center": strike,
@@ -326,11 +338,102 @@ def scan(symbols=None, quiet=False):
     return results
 
 
+def _split_csv(value):
+    return [p.strip().upper() for p in (value or "").split(",") if p.strip()]
+
+
+def _take_value(argv, i, arg):
+    """قيمة الوسيط: تدعم --opt=val و --opt val"""
+    if "=" in arg:
+        return arg.split("=", 1)[1], i
+    return (argv[i + 1] if i + 1 < len(argv) else ""), i + 1
+
+
+def _parse_args(argv):
+    opts = {"symbols": None, "sectors": None, "limit": None, "offset": 0,
+            "expiries": None, "cron": False, "list": False, "positional": []}
+    i = 0
+    while i < len(argv):
+        a = argv[i]
+        if a == "--cron":
+            opts["cron"] = True
+        elif a == "--list":
+            opts["list"] = True
+        elif a.startswith("--symbols"):
+            opts["symbols"], i = _take_value(argv, i, a)
+        elif a.startswith("--sectors"):
+            opts["sectors"], i = _take_value(argv, i, a)
+        elif a.startswith("--limit"):
+            val, i = _take_value(argv, i, a)
+            try:
+                opts["limit"] = max(0, int(val))
+            except ValueError:
+                opts["limit"] = None
+        elif a.startswith("--offset"):
+            val, i = _take_value(argv, i, a)
+            try:
+                opts["offset"] = max(0, int(val))
+            except ValueError:
+                opts["offset"] = 0
+        elif a.startswith("--expiries"):
+            val, i = _take_value(argv, i, a)
+            try:
+                opts["expiries"] = max(1, int(val))
+            except ValueError:
+                opts["expiries"] = None
+        else:
+            opts["positional"].append(a)
+        i += 1
+    return opts
+
+
+def select_symbols(opts):
+    """يحدّد الرموز والـ yahoo_map حسب الوسائط.
+
+    بلا تحديد صريح -> قائمة فهد (40)، وعند فشل الملف -> LEGACY_SYMBOLS.
+    """
+    loaded = load_fahad()
+    if loaded is None:
+        fahad_symbols, yahoo_map = list(LEGACY_SYMBOLS), {}
+    else:
+        fahad_symbols, _sector_of, yahoo_map, _meta = loaded
+
+    explicit = _split_csv(opts["symbols"]) if opts["symbols"] else []
+    if not explicit:
+        for p in opts["positional"]:
+            explicit.extend(_split_csv(p))
+
+    if explicit:
+        symbols = explicit
+    elif opts["sectors"]:
+        wanted = [s.strip() for s in opts["sectors"].split(",") if s.strip()]
+        symbols = symbols_by_sector(wanted)
+    else:
+        symbols = list(fahad_symbols)
+
+    offset = opts.get("offset") or 0
+    if offset:
+        symbols = symbols[offset:]
+    if opts.get("limit") is not None:
+        symbols = symbols[:opts["limit"]]
+    return symbols, yahoo_map
+
+
 def main():
-    args = sys.argv[1:]
-    quiet = "--cron" in args
-    symbols = [a for a in args if a != "--cron"] or None
-    results = scan(symbols, quiet=quiet)
+    global MAX_EXPIRIES
+    opts = _parse_args(sys.argv[1:])
+    symbols, yahoo_map = select_symbols(opts)
+
+    if opts["expiries"] is not None:
+        MAX_EXPIRIES = opts["expiries"]
+
+    if opts["list"]:
+        print(",".join(symbols))
+        print(f"العدد الكلي: {len(symbols)}")
+        return
+
+    quiet = opts["cron"]
+    results = scan(symbols, quiet=quiet, yahoo_map=yahoo_map)
     save_scan(results)
     signals = [r for r in results if r["signal"] in ("PUT", "CALL")]
     if not signals:
