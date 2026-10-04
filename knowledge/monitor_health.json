@@ -1,0 +1,11 @@
+{
+  "last_run_utc": "2026-10-04 12:04",
+  "status": "down",
+  "new_total": 0,
+  "errors": 3,
+  "channels": [
+    "mohammad-matr: خطأ وصول (The key is not registered in the system (caused by ResolveUsernameRequest))",
+    "sami-mukna: خطأ وصول (The key is not registered in the system (caused by GetChannelsRequest))",
+    "gamma-fahad: خطأ وصول (The key is not registered in the system (caused by ResolveUsernameRequest))"
+  ]
+}

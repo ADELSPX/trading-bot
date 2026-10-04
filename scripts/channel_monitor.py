@@ -12,6 +12,7 @@ API_ID = 39947157
 API_HASH = "a23b3c6a1f17e86a946872d455680030"
 SESSION = "/root/trading-bot/fazza_userbot.session"
 STATE_FILE = "/root/trading-bot/knowledge/monitor_state.json"
+HEALTH_FILE = "/root/trading-bot/knowledge/monitor_health.json"
 OUT_DIR = "/root/trading-bot/knowledge/lessons/channels"
 
 CHANNELS = {
@@ -68,6 +69,19 @@ async def fetch(cron_mode=False):
         else:
             summary.append(f"{key}: لا جديد")
     save_state(state)
+    # حالة المراقب — للأسبوعي/الفحص (لا ضجيج على المستخدم)
+    try:
+        errs = sum(1 for s in summary if "خطأ" in s)
+        health = {
+            "last_run_utc": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M"),
+            "status": "down" if errs >= len(CHANNELS) else ("degraded" if errs else "ok"),
+            "new_total": new_total,
+            "errors": errs,
+            "channels": summary,
+        }
+        json.dump(health, open(HEALTH_FILE, "w"), ensure_ascii=False, indent=2)
+    except Exception:
+        pass
     await c.disconnect()
     if cron_mode:
         if new_total > 0:
