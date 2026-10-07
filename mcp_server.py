@@ -1,29 +1,33 @@
 """
-MCP Server لبوت التداول
-يتيح لـ Hermes استدعاء أدوات التداول مباشرة عبر Model Context Protocol
-"""
+MCP Server لبوت التداول — JSON-RPC 2.0 over stdio (متوافق مع بروتوكول MCP الرسمي)
+النسخة القديمة كانت ببروتوكول مخصص (mcp.listTools) فما كان يتصل أبداً ويعيد المحاولة كل ~11 دقيقة.
 
+مهم: يُشغَّل بـ /usr/bin/python3 (اللي عنده yfinance 1.4.0) — مو venv هيرميس.
+"""
 import json
 import sys
-import os
-import importlib.util
 
 sys.path.insert(0, "/root/trading-bot")
 
+PROTOCOL_VERSION = "2024-11-05"
+SERVER_INFO = {"name": "trading-bot-mcp", "version": "2.0.0"}
+
 TOOLS = []
 
+
 def tool(name, description, parameters):
-    """Decorator لتسجيل أداة MCP"""
     def decorator(func):
         TOOLS.append({
             "name": name,
             "description": description,
-            "parameters": parameters,
-            "handler": func
+            "inputSchema": parameters,
+            "handler": func,
         })
         return func
     return decorator
 
+
+# ── الأدوات ──────────────────────────────────────────────
 
 @tool(
     name="generate_signal",
@@ -34,19 +38,18 @@ def tool(name, description, parameters):
             "strategy": {
                 "type": "string",
                 "enum": ["supply_demand", "gamma"],
-                "description": "الاستراتيجية: supply_demand أو gamma"
+                "description": "الاستراتيجية: supply_demand أو gamma",
             }
         },
-        "required": ["strategy"]
-    }
+        "required": ["strategy"],
+    },
 )
 def handle_generate_signal(params):
-    """توليد إشارة من bot.signal_builder"""
     try:
         from bot.signal_builder import SignalBuilder
         sb = SignalBuilder()
         result = sb.build(strategy=params.get("strategy", "supply_demand"))
-        return {"success": True, "signal": result[:1000]}
+        return {"success": True, "signal": str(result)[:1000]}
     except Exception as e:
         return {"success": False, "error": str(e)}
 
@@ -54,24 +57,30 @@ def handle_generate_signal(params):
 @tool(
     name="get_spx_price",
     description="الحصول على آخر سعر SPX",
-    parameters={"type": "object", "properties": {}}
+    parameters={"type": "object", "properties": {}},
 )
 def handle_get_spx_price(params):
-    """جلب سعر SPX من yfinance"""
+    """يقرأ من كاش SQLite المحلي (زمن شبه صفري). الشبكة فقط عند انتهاء الصلاحية أو غياب القيمة."""
     try:
-        import yfinance as yf
-        spx = yf.Ticker("^SPX")
-        data = spx.history(period="1d", interval="1m")
-        if not data.empty:
-            last = data.iloc[-1]
-            return {
-                "success": True,
-                "price": round(float(last["Close"]), 2),
-                "high": round(float(last["High"]), 2),
-                "low": round(float(last["Low"]), 2),
-                "volume": int(last["Volume"])
-            }
-        return {"success": False, "error": "No data"}
+        import market_cache as mc
+        r = mc.get_quote(params.get("symbol", "SPX") if params else "SPX")
+        if not r.get("price"):
+            return {"success": False, "error": r.get("error", "No data")}
+        out = {
+            "success": True,
+            "price": r["price"],
+            "high": r.get("high"),
+            "low": r.get("low"),
+            "volume": r.get("volume"),
+            "prev_close": r.get("prev_close"),
+            "cache_status": r.get("cache_status"),      # hit | refreshed | stale
+            "age_minutes": r.get("age_minutes"),
+            "as_of_utc": r.get("fetched_at"),
+            "source": r.get("source"),
+        }
+        if r.get("stale"):
+            out["stale_warning"] = "القيمة هي آخر ما توفر (تعذّر التحديث من المصدر) — مو لحظية"
+        return out
     except Exception as e:
         return {"success": False, "error": str(e)}
 
@@ -79,93 +88,106 @@ def handle_get_spx_price(params):
 @tool(
     name="check_price_alerts",
     description="فحص إنذارات السعر (مستويات الدعم والمقاومة)",
-    parameters={"type": "object", "properties": {}}
+    parameters={"type": "object", "properties": {}},
 )
 def handle_check_price_alerts(params):
-    """فحص مستويات الدعم والمقاومة"""
+    """الإنذارات من كاش SQLite. لو انتهت صلاحيتها تُحسب من الشمعات المخزّنة (بلا شبكة)،
+    والمصدر الخارجي ما يُستدعى إلا إذا ما فيه شمعات أصلاً."""
     try:
-        import yfinance as yf
-        spx = yf.Ticker("^SPX")
-        data = spx.history(period="5d", interval="5m")
-        if data.empty:
-            return {"success": False, "error": "No data"}
-        
-        closes = data["Close"].values
-        current = closes[-1]
-        support = round(float(min(closes[-20:])), 2)
-        resistance = round(float(max(closes[-20:])), 2)
-        
-        alerts = []
-        if current <= support * 1.005:
-            alerts.append("⚠️ قرب الدعم — احتمال صعود (CALL)")
-        if current >= resistance * 0.995:
-            alerts.append("⚠️ قرب المقاومة — احتمال هبوط (PUT)")
-        
-        return {
+        import market_cache as mc
+        r = mc.get_alerts(params.get("symbol", "SPX") if params else "SPX")
+        if "current" not in r:
+            return {"success": False, "error": r.get("error", "No data")}
+        out = {
             "success": True,
-            "current": round(float(current), 2),
-            "support": support,
-            "resistance": resistance,
-            "alerts": alerts
+            "current": r.get("current"),
+            "support": r.get("support"),
+            "resistance": r.get("resistance"),
+            "alerts": r.get("alerts", []),
+            "computed_at_utc": r.get("fetched_at"),
+            "age_minutes": r.get("age_minutes"),
+            "cache_status": r.get("cache_status"),
         }
+        if r.get("stale"):
+            out["stale_warning"] = "المستويات من آخر حساب متوفر — مو لحظية"
+        return out
     except Exception as e:
         return {"success": False, "error": str(e)}
 
 
-# ── MCP Protocol Handler ────────────────────────────────
+# ── JSON-RPC / MCP ───────────────────────────────────────
 
-def handle_mcp_request(raw: str) -> str:
-    """MCP handler: stdin/stdout protocol"""
-    try:
-        req = json.loads(raw)
-    except json.JSONDecodeError:
-        return json.dumps({"error": "Invalid JSON"})
+def _ok(req_id, result):
+    return {"jsonrpc": "2.0", "id": req_id, "result": result}
 
+
+def _err(req_id, code, message):
+    return {"jsonrpc": "2.0", "id": req_id, "error": {"code": code, "message": message}}
+
+
+def handle(req):
     method = req.get("method", "")
-    
-    if method == "mcp.listTools":
-        return json.dumps({
-            "result": {
-                "tools": [
-                    {
-                        "name": t["name"],
-                        "description": t["description"],
-                        "parameters": t["parameters"]
-                    }
-                    for t in TOOLS
-                ]
-            }
+    req_id = req.get("id")
+
+    if method == "initialize":
+        return _ok(req_id, {
+            "protocolVersion": PROTOCOL_VERSION,
+            "capabilities": {"tools": {"listChanged": False}},
+            "serverInfo": SERVER_INFO,
         })
-    
-    elif method == "mcp.callTool":
-        name = req.get("params", {}).get("name", "")
-        params = req.get("params", {}).get("parameters", {})
-        
+
+    if method == "notifications/initialized":
+        return None
+
+    if method == "ping":
+        return _ok(req_id, {})
+
+    if method == "tools/list":
+        return _ok(req_id, {
+            "tools": [
+                {"name": t["name"], "description": t["description"], "inputSchema": t["inputSchema"]}
+                for t in TOOLS
+            ]
+        })
+
+    if method == "tools/call":
+        p = req.get("params", {}) or {}
+        name = p.get("name", "")
+        args = p.get("arguments", {}) or {}
         for t in TOOLS:
             if t["name"] == name:
-                result = t["handler"](params)
-                return json.dumps({"result": result})
-        
-        return json.dumps({"error": f"Tool '{name}' not found"})
-    
-    elif method == "mcp.describe":
-        return json.dumps({
-            "result": {
-                "name": "trading-bot-mcp",
-                "version": "1.0.0",
-                "description": "MCP server لبوت تداول SPX"
-            }
-        })
-    
-    else:
-        return json.dumps({"error": f"Unknown method: {method}"})
+                try:
+                    out = t["handler"](args)
+                    is_error = bool(isinstance(out, dict) and out.get("success") is False)
+                    return _ok(req_id, {
+                        "content": [{"type": "text", "text": json.dumps(out, ensure_ascii=False)}],
+                        "isError": is_error,
+                    })
+                except Exception as e:
+                    return _ok(req_id, {
+                        "content": [{"type": "text", "text": json.dumps({"success": False, "error": str(e)}, ensure_ascii=False)}],
+                        "isError": True,
+                    })
+        return _err(req_id, -32602, f"Tool '{name}' not found")
+
+    return _err(req_id, -32601, f"Method not found: {method}")
 
 
-if __name__ == "__main__":
-    # MCP mode: read JSON lines from stdin, write to stdout
+def main():
     for line in sys.stdin:
         line = line.strip()
         if not line:
             continue
-        response = handle_mcp_request(line)
-        print(response, flush=True)
+        try:
+            req = json.loads(line)
+        except json.JSONDecodeError:
+            print(json.dumps({"jsonrpc": "2.0", "id": None,
+                              "error": {"code": -32700, "message": "Parse error"}}), flush=True)
+            continue
+        resp = handle(req)
+        if resp is not None:
+            print(json.dumps(resp, ensure_ascii=False), flush=True)
+
+
+if __name__ == "__main__":
+    main()
